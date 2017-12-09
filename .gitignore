@@ -1,0 +1,9 @@
+# Binaries
+gossiper
+client/client
+
+# out files
+*.out
+
+# Mac
+.DS_Store

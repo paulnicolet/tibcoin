@@ -1,0 +1,7 @@
+#navbar {
+    background-color: rgb(45, 150, 240);
+}
+
+.uk-navbar-nav>li>a {
+    color: white !important;
+}
