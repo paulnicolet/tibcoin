@@ -8,6 +8,27 @@ import (
 	"github.com/paulnicolet/tibcoin/common"
 )
 
+type FileSearchState struct {
+	FileName         string
+	MetaHash         []byte
+	MetaFile         []byte
+	Chunks           map[uint64][]string
+	AvailableChunks  uint64
+	MetaFileRequests map[string]*Timeout
+}
+
+type FileSearchRequest struct {
+	Keywords      []string
+	CurrentBudget uint64
+	Files         map[string]*FileSearchState
+	Timeout       *Timeout
+}
+
+type ReceivedSearchRequest struct {
+	Timestamp time.Time
+	Request   *common.SearchRequest
+}
+
 func (gossiper *Gossiper) SearchReplyRoutine(channel <-chan *GossiperPacketSender) {
 	for {
 		packet := <-channel

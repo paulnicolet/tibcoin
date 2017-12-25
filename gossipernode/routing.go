@@ -9,6 +9,11 @@ import (
 	"github.com/paulnicolet/tibcoin/common"
 )
 
+type NextHop struct {
+	Hop    *net.UDPAddr
+	Direct bool
+}
+
 // -------------------------------- Routines -------------------------------- //
 
 func (gossiper *Gossiper) RouteRumoringRoutine() {

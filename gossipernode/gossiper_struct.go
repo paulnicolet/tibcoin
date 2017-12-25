@@ -1,6 +1,9 @@
 package gossipernode
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"fmt"
 	"log"
 	"net"
@@ -11,12 +14,6 @@ import (
 
 	"github.com/paulnicolet/tibcoin/common"
 )
-
-type TimerContainer struct {
-	ack   chan (bool)
-	timer *time.Timer
-	rumor *common.RumorMessage
-}
 
 type Packet struct {
 	from    *net.UDPAddr
@@ -42,41 +39,16 @@ type Peer struct {
 	timers []*TimerContainer
 }
 
-type NextHop struct {
-	Hop    *net.UDPAddr
-	Direct bool
-}
-
-type DownloadState struct {
-	SearchState *FileSearchState
-	Tickers     map[uint64]*Timeout
+type TimerContainer struct {
+	ack   chan (bool)
+	timer *time.Timer
+	rumor *common.RumorMessage
 }
 
 // TODO use timeouts everywhere
 type Timeout struct {
 	Ticker *time.Ticker
 	Killer chan bool
-}
-
-type FileSearchState struct {
-	FileName         string
-	MetaHash         []byte
-	MetaFile         []byte
-	Chunks           map[uint64][]string
-	AvailableChunks  uint64
-	MetaFileRequests map[string]*Timeout
-}
-
-type FileSearchRequest struct {
-	Keywords      []string
-	CurrentBudget uint64
-	Files         map[string]*FileSearchState
-	Timeout       *Timeout
-}
-
-type ReceivedSearchRequest struct {
-	Timestamp time.Time
-	Request   *common.SearchRequest
 }
 
 type Gossiper struct {
@@ -108,6 +80,7 @@ type Gossiper struct {
 	matches                []*FileSearchState
 	recentRequestsMutex    *sync.Mutex
 	recentReceivedRequests []*ReceivedSearchRequest
+	privateKey             *ecdsa.PrivateKey
 }
 
 func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDPAddr, peersAddr []*net.UDPAddr, rtimer *time.Duration, noforward bool) (*Gossiper, error) {
@@ -130,6 +103,12 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 		if addr.String() != gossipAddr.String() {
 			peers[addr.String()] = &Peer{addr: addr, mutex: &sync.Mutex{}}
 		}
+	}
+
+	// Generate public/private key pair
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Gossiper{
@@ -159,6 +138,7 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 		recentRequestsMutex:    &sync.Mutex{},
 		recentReceivedRequests: make([]*ReceivedSearchRequest, 0, 0),
 		matchesMutex:           &sync.Mutex{},
+		privateKey:             key,
 	}, nil
 }
 

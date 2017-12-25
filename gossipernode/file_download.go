@@ -9,6 +9,11 @@ import (
 	"github.com/paulnicolet/tibcoin/common"
 )
 
+type DownloadState struct {
+	SearchState *FileSearchState
+	Tickers     map[uint64]*Timeout
+}
+
 func (gossiper *Gossiper) DataReplyRoutine(channel <-chan *GossiperPacketSender) {
 	for {
 		packet := <-channel
