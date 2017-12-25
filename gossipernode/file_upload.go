@@ -3,7 +3,8 @@ package gossipernode
 import (
 	"bytes"
 	"fmt"
-	"github.com/paulnicolet/Peerster/part2/common"
+
+	"github.com/paulnicolet/tibcoin/common"
 )
 
 func (gossiper *Gossiper) DataRequestRoutine(channel <-chan *GossiperPacketSender) {

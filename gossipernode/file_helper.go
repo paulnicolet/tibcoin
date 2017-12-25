@@ -5,10 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/paulnicolet/Peerster/part2/common"
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/paulnicolet/tibcoin/common"
 )
 
 func (gossiper *Gossiper) initFile(name string, metafile []byte, metahash []byte) *common.File {

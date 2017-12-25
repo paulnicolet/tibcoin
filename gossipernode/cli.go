@@ -2,7 +2,7 @@ package gossipernode
 
 import (
 	"github.com/dedis/protobuf"
-	"github.com/paulnicolet/Peerster/part2/common"
+	"github.com/paulnicolet/tibcoin/common"
 )
 
 func (gossiper *Gossiper) CLIRoutine(channel <-chan *Packet) {

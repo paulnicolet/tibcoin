@@ -3,9 +3,10 @@ package gossipernode
 import (
 	"bytes"
 	"fmt"
-	"github.com/paulnicolet/Peerster/part2/common"
 	"math/rand"
 	"time"
+
+	"github.com/paulnicolet/tibcoin/common"
 )
 
 func (gossiper *Gossiper) DataReplyRoutine(channel <-chan *GossiperPacketSender) {

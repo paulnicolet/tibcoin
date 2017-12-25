@@ -3,14 +3,15 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/paulnicolet/Peerster/part2/common"
-	"github.com/paulnicolet/Peerster/part2/gossipernode"
 	"log"
 	"net"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/paulnicolet/tibcoin/common"
+	"github.com/paulnicolet/tibcoin/gossipernode"
 )
 
 const DEFAULT_RTIMER = "60"

@@ -1,7 +1,7 @@
 package gossipernode
 
 import (
-	"github.com/paulnicolet/Peerster/part2/common"
+	"github.com/paulnicolet/tibcoin/common"
 )
 
 // -------------------------------- Routines -------------------------------- //

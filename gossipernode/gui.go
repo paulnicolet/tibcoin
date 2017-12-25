@@ -3,10 +3,11 @@ package gossipernode
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/mux"
-	"github.com/paulnicolet/Peerster/part2/common"
 	"net/http"
 	"strings"
+
+	"github.com/gorilla/mux"
+	"github.com/paulnicolet/tibcoin/common"
 )
 
 func (gossiper *Gossiper) LaunchWebServer() {

@@ -1,9 +1,10 @@
 package gossipernode
 
 import (
-	"github.com/paulnicolet/Peerster/part2/common"
 	"strings"
 	"time"
+
+	"github.com/paulnicolet/tibcoin/common"
 )
 
 func (gossiper *Gossiper) SearchRequestRoutine(channel <-chan *GossiperPacketSender) {

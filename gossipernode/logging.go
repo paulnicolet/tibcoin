@@ -3,9 +3,10 @@ package gossipernode
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/paulnicolet/Peerster/part2/common"
 	"net"
 	"strings"
+
+	"github.com/paulnicolet/tibcoin/common"
 )
 
 func (gossiper *Gossiper) logSearchReply(reply *common.SearchReply, budget uint64) {

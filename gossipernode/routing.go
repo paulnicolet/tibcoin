@@ -2,10 +2,11 @@ package gossipernode
 
 import (
 	"fmt"
-	"github.com/dedis/protobuf"
-	"github.com/paulnicolet/Peerster/part2/common"
 	"net"
 	"time"
+
+	"github.com/dedis/protobuf"
+	"github.com/paulnicolet/tibcoin/common"
 )
 
 // -------------------------------- Routines -------------------------------- //

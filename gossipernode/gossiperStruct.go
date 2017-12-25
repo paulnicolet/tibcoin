@@ -2,13 +2,14 @@ package gossipernode
 
 import (
 	"fmt"
-	"github.com/paulnicolet/Peerster/part2/common"
 	"log"
 	"net"
 	"os"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/paulnicolet/tibcoin/common"
 )
 
 type TimerContainer struct {

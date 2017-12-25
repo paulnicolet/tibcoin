@@ -1,9 +1,10 @@
 package gossipernode
 
 import (
-	"github.com/paulnicolet/Peerster/part2/common"
 	"net"
 	"time"
+
+	"github.com/paulnicolet/tibcoin/common"
 )
 
 func (gossiper *Gossiper) sendNewPrivateMessage(message string, dest string) {

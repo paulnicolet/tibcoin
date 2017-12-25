@@ -1,12 +1,13 @@
 package gossipernode
 
 import (
-	"github.com/dedis/protobuf"
-	"github.com/paulnicolet/Peerster/part2/common"
 	"math/rand"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/dedis/protobuf"
+	"github.com/paulnicolet/tibcoin/common"
 )
 
 // -------------------------------- Routines -------------------------------- //
