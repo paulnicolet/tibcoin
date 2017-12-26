@@ -1,16 +1,38 @@
 package gossipernode
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/rand"
 
 	"github.com/paulnicolet/tibcoin/common"
 )
 
+/*
+Simplified transaction scheme:
+
+Bitcoin uses scripting to lock and unlock transactions to provide a generic
+way to verifiy transactions, since it provides multiple transaction types.
+In our case only P2PKH is used, and we remove scripting:
+
+1. Each transaction output links receiver with its address (PKH)
+2. Each transaction input links UTXO with its tx hash and index
+3. Each transaction is signed using the private key and provides the public key
+4. To verify a transaction signature
+	1. Derive address from transaction public key and make sure it is the same
+		as in each UTXO
+	2. If it is the case, check the signature with the public key
+	3. If it succeeds, the transaction has been signed by the receiver of each
+		UTXO, it can then spend the UTXOs
+*/
+
 type Transaction struct {
 	inputs  []TxInput
 	outputs []TxOutput
-	sig     common.Sig
+	// Transaction signature
+	sig common.Sig
+	// Public key needed to check signature against UTXOs
+	publicKey ecdsa.PublicKey
 }
 
 type TxInput struct {
@@ -63,5 +85,25 @@ func (gossiper *Gossiper) signTx(tx *Transaction) (*Transaction, error) {
 
 func (gossiper *Gossiper) checkSig(tx *Transaction) bool {
 	// Check tx signature against each UTXO
-	return false
+	address := common.PublicKeyToAddress(tx.publicKey)
+	signable := tx.getSignable()
+
+	for _, input := range tx.inputs {
+		output, err := input.getOutput()
+		if err != nil {
+			return false
+		}
+
+		// Check receiver address
+		if !bytes.Equal(output.to.PubKeyHash[:], address.PubKeyHash[:]) {
+			return false
+		}
+
+		// Check signature
+		if !ecdsa.Verify(&tx.publicKey, signable, tx.sig.R, tx.sig.S) {
+			return false
+		}
+	}
+
+	return true
 }
