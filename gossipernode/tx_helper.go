@@ -90,10 +90,18 @@ func (in *TxInput) equals(other *TxInput) bool {
 
 // We are looking only in the main branch for a correpsonding transaction
 func (gossiper *Gossiper) getOutput(in *TxInput) (*TxOutput, error) {
-	currentBlock, blockExists := gossiper.blocks[gossiper.topBlock]
+	// Get top block hash
+	gossiper.topBlockMutex.Lock()
+	topBlock := gossiper.topBlock
+	gossiper.topBlockMutex.Unlock()
+
+	// Get top block
+	gossiper.blocksMutex.Lock()
+	currentBlock, blockExists := gossiper.blocks[topBlock]
+	gossiper.blocksMutex.Unlock()
 
 	if !blockExists {
-		return nil, errors.New(fmt.Sprintf("Top block (hash = %x) not found in 'gossiper.blocks'.", gossiper.topBlock[:]))
+		return nil, errors.New(fmt.Sprintf("Top block (hash = %x) not found in 'gossiper.blocks'.", topBlock[:]))
 	}
 
 	for blockExists {
@@ -110,7 +118,9 @@ func (gossiper *Gossiper) getOutput(in *TxInput) (*TxOutput, error) {
 		}
 
 		// Get the previous block
+		gossiper.blocksMutex.Lock()
 		currentBlock, blockExists = gossiper.blocks[currentBlock.PrevHash]
+		gossiper.blocksMutex.Unlock()
 	}
 
 	return nil, errors.New(fmt.Sprintf("Transaction not found in main branch (hash = %x).", in.outputTxHash[:]))

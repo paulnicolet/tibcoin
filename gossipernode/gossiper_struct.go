@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"net"
@@ -91,6 +92,8 @@ type Gossiper struct {
 	blockOrphanPoolMutex   *sync.Mutex
 	txPool                 []*Transaction
 	txPoolMutex            *sync.Mutex
+	target				   [32]byte
+	targetMutex			   *sync.Mutex
 }
 
 func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDPAddr, peersAddr []*net.UDPAddr, rtimer *time.Duration, noforward bool) (*Gossiper, error) {
@@ -123,8 +126,9 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 
 	// Init first block
 	blocks := make(map[[32]byte]*Block)
-	genesisHash := GenesisBlockHash()
-	blocks[genesisHash] = &GenesisBlock
+	genesisHash := GenesisBlock.hash()
+	blocks[genesisHash] = GenesisBlock
+	initialTarget, _ := hex.DecodeString("00000FFFFFFFFFFF000000000000000000000000000000000000000000000000")
 
 	return &Gossiper{
 		name:                   name,
@@ -164,6 +168,8 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 		blockOrphanPoolMutex:   &sync.Mutex{},
 		txPool:                 make([]*Transaction, 0),
 		txPoolMutex:            &sync.Mutex{},
+		target:					BytesToHash(initialTarget),
+		targetMutex:			&sync.Mutex{},
 	}, nil
 }
 
@@ -179,6 +185,7 @@ func (gossiper *Gossiper) Start() error {
 	searchReplyChannel := make(chan *GossiperPacketSender)
 	blockRequestChannel := make(chan *GossiperPacketSender)
 	blockReplyChannel := make(chan *GossiperPacketSender)
+	startMiningChannel := make(chan bool)
 
 	// Launch webserver
 	go gossiper.LaunchWebServer()
@@ -204,8 +211,14 @@ func (gossiper *Gossiper) Start() error {
 	// Spawn route rumoring routine
 	go gossiper.RouteRumoringRoutine()
 
+	// Miner
+	go gossiper.Mine(startMiningChannel)
+
 	add := PublicKeyToAddress(gossiper.privateKey.PublicKey)
-	gossiper.errLogger.Printf("Tibcoin address %s", add)
+	gossiper.errLogger.Printf("Tibcoin address %s\n", add)
+
+	// TODO: Do this to start mining. Should we only start when we are up to date and have all the blocks?
+	startMiningChannel <- true
 
 	select {}
 }
