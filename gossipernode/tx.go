@@ -109,6 +109,7 @@ func (gossiper *Gossiper) NewTransaction(to string, value int) (*Transaction, er
 }
 
 func (gossiper *Gossiper) VerifyTransaction(tx *Transaction) bool {
+	// TODO orphan transactions ?
 	// Simplified version of https://en.bitcoin.it/wiki/Protocol_rules#.22tx.22_messages
 	// Check neither in or out lists are empty
 	if len(tx.inputs) == 0 || len(tx.outputs) == 0 {
