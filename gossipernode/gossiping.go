@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dedis/protobuf"
+	"github.com/paulnicolet/tibcoin/blockchain"
 	"github.com/paulnicolet/tibcoin/common"
 )
 
@@ -42,7 +43,9 @@ func (gossiper *Gossiper) GossiperRoutine(
 	dataRequestChannel chan<- *GossiperPacketSender,
 	dataReplyChannel chan<- *GossiperPacketSender,
 	searchRequestChannel chan<- *GossiperPacketSender,
-	searchReplyChannel chan<- *GossiperPacketSender) {
+	searchReplyChannel chan<- *GossiperPacketSender,
+	blockRequestChannel chan<- *GossiperPacketSender,
+	blockReplyChannel chan<- *GossiperPacketSender) {
 	for {
 		packet := <-gossipChannel
 
@@ -69,6 +72,10 @@ func (gossiper *Gossiper) GossiperRoutine(
 			searchRequestChannel <- &GossiperPacketSender{from: packet.from, packet: &gossipPacket}
 		} else if gossipPacket.SearchReply != nil {
 			searchReplyChannel <- &GossiperPacketSender{from: packet.from, packet: &gossipPacket}
+		} else if gossipPacket.BlockRequest != nil {
+			blockRequestChannel <- &GossiperPacketSender{from: packet.from, packet: &gossipPacket}
+		} else if gossipPacket.BlockReply != nil {
+			blockReplyChannel <- &GossiperPacketSender{from: packet.from, packet: &gossipPacket}
 		} else {
 			gossiper.errLogger.Println(packet.from)
 			gossiper.errLogger.Println("Invalid packet")

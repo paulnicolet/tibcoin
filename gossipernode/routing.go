@@ -164,6 +164,15 @@ func (gossiper *Gossiper) packPrivateRequest(request *common.DataRequest) *commo
 	}
 }
 
+func (gossiper *Gossiper) packBlockRequest(request *common.BlockRequest) *common.PrivatePacket {
+	return &common.PrivatePacket{
+		Origin:       request.Origin,
+		Destination:  request.Destination,
+		HopLimit:     request.HopLimit,
+		BlockRequest: request,
+	}
+}
+
 func (gossiper *Gossiper) packPrivateReply(reply *common.DataReply) *common.PrivatePacket {
 	return &common.PrivatePacket{
 		Origin:      reply.Origin,
@@ -179,6 +188,15 @@ func (gossiper *Gossiper) packPrivateSearchReply(reply *common.SearchReply) *com
 		Destination: reply.Destination,
 		HopLimit:    reply.HopLimit,
 		SearchReply: reply,
+	}
+}
+
+func (gossiper *Gossiper) packBlockReply(reply *common.BlockReply) *common.PrivatePacket {
+	return &common.PrivatePacket{
+		Origin:      reply.Origin,
+		Destination: reply.Destination,
+		HopLimit:    reply.HopLimit,
+		BlockReply:  reply,
 	}
 }
 
