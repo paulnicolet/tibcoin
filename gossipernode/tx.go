@@ -111,16 +111,97 @@ func (gossiper *Gossiper) NewTransaction(to string, value int) (*Transaction, er
 func (gossiper *Gossiper) VerifyTransaction(tx *Transaction) bool {
 	// Simplified version of https://en.bitcoin.it/wiki/Protocol_rules#.22tx.22_messages
 	// Check neither in or out lists are empty
+	if len(tx.inputs) == 0 || len(tx.outputs) == 0 {
+		return false
+	}
+
 	// Check size < block size
+	if tx.size() >= MaxBlockSize {
+		return false
+	}
+
 	// Each output must be in legal money range
+	outputSum := 0
+	for _, output := range tx.outputs {
+		outputSum += output.value
+		if output.value <= 0 || output.value > MaxCoins {
+			return false
+		}
+	}
+
 	// Reject if tx already present in the pool
 	// Check that UTXO of each input are not already used by tx in the pool
-	// Look for UTXOs in the main chain, or if in fork or orphan block, put in orphan txs
-	// Check that input values are in legal money range
+	gossiper.txPoolMutex.Lock()
+	for _, other := range gossiper.txPool {
+		if tx.equals(other) {
+			gossiper.txPoolMutex.Unlock()
+			return false
+		}
+
+		for _, otherInput := range other.inputs {
+			for _, input := range tx.inputs {
+				if bytes.Equal(input.outputTxHash[:], otherInput.outputTxHash[:]) && input.outputIdx == otherInput.outputIdx {
+					gossiper.txPoolMutex.Unlock()
+					return false
+				}
+			}
+		}
+	}
+	gossiper.txPoolMutex.Unlock()
+
+	// Look for UTXOs in the main chain or tx pool
+	inputSum := 0
+	var outputs []*TxOutputLocation
+	for _, input := range tx.inputs {
+		found := false
+		output, err := gossiper.getOutput(input)
+
+		// Check that input values are in legal money range BTW
+		inputSum += output.value
+		if output.value <= 0 || output.value > MaxCoins {
+			return false
+		}
+
+		if err != nil {
+			// Look in the pool if not found
+			gossiper.txPoolMutex.Lock()
+			for _, other := range gossiper.txPool {
+				otherTxHash := other.hash()
+				if bytes.Equal(input.outputTxHash[:], otherTxHash[:]) && input.outputIdx < len(other.outputs) {
+					found = true
+					break
+				}
+			}
+			gossiper.txPoolMutex.Unlock()
+
+			if !found {
+				return false
+			}
+		} else {
+			// If found, collect output, to check if spent later on (to go only once through the chain)
+			location := &TxOutputLocation{
+				output:       output,
+				outputTxHash: input.outputTxHash,
+				outputIdx:    input.outputIdx,
+			}
+			outputs = append(outputs, location)
+		}
+	}
+
+	// Check if outputs have been spent already
+	if gossiper.alreadySpent(outputs) {
+		return false
+	}
+
 	// Check that sum of input > sum of outputs
-	// Check that tx fee is enough to get into an empty block
+	if inputSum <= outputSum {
+		return false
+	}
+
+	// Check that tx fee is enough to get into an empty block (WHAT ?)
+
 	// Check sig against each output
-	return false
+	return gossiper.checkSig(tx)
 }
 
 // Return an error if an input didn't correspond to any known output in the main branch
@@ -187,17 +268,16 @@ func (gossiper *Gossiper) FilterSpentOutputs(outputs []*TxOutputLocation) []*TxO
 
 	// Get first hash
 	gossiper.topBlockMutex.Lock()
-	currentBlockHash := gossiper.topBlock
+	topBlockHash := gossiper.topBlock
 	gossiper.topBlockMutex.Unlock()
-	genesisHash := GenesisBlockHash()
+
+	// Get block
+	gossiper.blocksMutex.Lock()
+	currentBlock, blockExists := gossiper.blocks[topBlockHash]
+	gossiper.blocksMutex.Unlock()
 
 	// Look for spent outputs
-	for {
-		// Get block
-		gossiper.blocksMutex.Lock()
-		currentBlock := gossiper.blocks[currentBlockHash]
-		gossiper.blocksMutex.Unlock()
-
+	for blockExists {
 		for _, tx := range currentBlock.Txs {
 			for _, input := range tx.inputs {
 				for idx, outputLocation := range outputs {
@@ -208,11 +288,9 @@ func (gossiper *Gossiper) FilterSpentOutputs(outputs []*TxOutputLocation) []*TxO
 			}
 		}
 
-		// Break if root of the chain
-		if bytes.Equal(currentBlockHash[:], genesisHash[:]) {
-			break
-		}
-		currentBlockHash = currentBlock.PrevHash
+		gossiper.blocksMutex.Lock()
+		currentBlock, blockExists = gossiper.blocks[currentBlock.PrevHash]
+		gossiper.blocksMutex.Unlock()
 	}
 
 	// Filter spent outputs
@@ -234,16 +312,15 @@ func (gossiper *Gossiper) CollectOutputs() []*TxOutputLocation {
 
 	// Get first hash
 	gossiper.topBlockMutex.Lock()
-	currentBlockHash := gossiper.topBlock
+	topBlockHash := gossiper.topBlock
 	gossiper.topBlockMutex.Unlock()
-	genesisHash := GenesisBlockHash()
 
-	for {
-		// Get block
-		gossiper.blocksMutex.Lock()
-		currentBlock := gossiper.blocks[currentBlockHash]
-		gossiper.blocksMutex.Unlock()
+	// Get block
+	gossiper.blocksMutex.Lock()
+	currentBlock, blockExists := gossiper.blocks[topBlockHash]
+	gossiper.blocksMutex.Unlock()
 
+	for blockExists {
 		for _, tx := range currentBlock.Txs {
 			for idx, output := range tx.outputs {
 				if output.to == address {
@@ -257,11 +334,9 @@ func (gossiper *Gossiper) CollectOutputs() []*TxOutputLocation {
 			}
 		}
 
-		// Break if root of the chain
-		if bytes.Equal(currentBlockHash[:], genesisHash[:]) {
-			break
-		}
-		currentBlockHash = currentBlock.PrevHash
+		gossiper.blocksMutex.Lock()
+		currentBlock, blockExists = gossiper.blocks[currentBlock.PrevHash]
+		gossiper.blocksMutex.Unlock()
 	}
 
 	return outputs
