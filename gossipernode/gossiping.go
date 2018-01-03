@@ -42,7 +42,9 @@ func (gossiper *Gossiper) GossiperRoutine(
 	dataRequestChannel chan<- *GossiperPacketSender,
 	dataReplyChannel chan<- *GossiperPacketSender,
 	searchRequestChannel chan<- *GossiperPacketSender,
-	searchReplyChannel chan<- *GossiperPacketSender) {
+	searchReplyChannel chan<- *GossiperPacketSender,
+	blockRequestChannel chan<- *GossiperPacketSender,
+	blockReplyChannel chan<- *GossiperPacketSender) {
 	for {
 		packet := <-gossipChannel
 

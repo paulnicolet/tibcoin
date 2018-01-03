@@ -32,13 +32,13 @@ func (tx *Transaction) equals(other *Transaction) bool {
 	}
 
 	for i, input := range tx.inputs {
-		if !input.equals(&other.inputs[i]) {
+		if !input.equals(other.inputs[i]) {
 			return false
 		}
 	}
 
 	for i, output := range tx.outputs {
-		if !output.equals(&other.outputs[i]) {
+		if !output.equals(other.outputs[i]) {
 			return false
 		}
 	}
@@ -58,7 +58,7 @@ func (in *TxInput) equals(other *TxInput) bool {
 	return bytes.Equal(in.outputTxHash, other.outputTxHash) && in.outputIdx == other.outputIdx
 }
 
-func (in *TxInput) getOutput() (*TxOutput, error) {
+func (gossiper *Gossiper) getOutput(in *TxInput) (*TxOutput, error) {
 	return nil, nil
 }
 

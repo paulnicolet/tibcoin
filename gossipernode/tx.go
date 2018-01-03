@@ -24,8 +24,8 @@ In our case only P2PKH is used, and we remove scripting:
 */
 
 type Transaction struct {
-	inputs  []TxInput
-	outputs []TxOutput
+	inputs  []*TxInput
+	outputs []*TxOutput
 	// Transaction signature
 	sig Sig
 	// Public key needed to check signature against UTXOs
@@ -38,7 +38,7 @@ type TxInput struct {
 }
 
 type TxOutput struct {
-	value uint
+	value int
 	to    string
 }
 
@@ -70,6 +70,29 @@ func (gossiper *Gossiper) VerifyTransaction(tx *Transaction) bool {
 	return false
 }
 
+// Return an error if an input didn't correspond to any known output in the main branch
+func (gossiper *Gossiper) computeTxFee(tx *Transaction) (int, error) {
+	// Look for input values
+	inputsCash := 0
+	for _, input := range tx.inputs {
+		corrTxOutput, outputErr := gossiper.getOutput(input)
+		if outputErr != nil {
+			return 0, outputErr
+		}
+
+		inputsCash += corrTxOutput.value
+	}
+
+	// Look for output values
+	outputsCash := 0
+	for _, output := range tx.outputs {
+		inputsCash += output.value
+	}
+
+	// Fee is the difference
+	return inputsCash - outputsCash, nil
+}
+
 func (gossiper *Gossiper) signTx(tx *Transaction) (*Transaction, error) {
 	r, s, err := ecdsa.Sign(rand.Reader, gossiper.privateKey, tx.getSignable())
 	if err != nil {
@@ -86,7 +109,7 @@ func (gossiper *Gossiper) checkSig(tx *Transaction) bool {
 	signable := tx.getSignable()
 
 	for _, input := range tx.inputs {
-		output, err := input.getOutput()
+		output, err := gossiper.getOutput(input)
 		if err != nil {
 			return false
 		}
