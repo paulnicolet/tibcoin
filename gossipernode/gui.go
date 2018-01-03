@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
-	"github.com/paulnicolet/tibcoin/common"
 )
 
 func (gossiper *Gossiper) LaunchWebServer() {
@@ -227,7 +226,7 @@ func (gossiper *Gossiper) NewSearchHandler(w http.ResponseWriter, r *http.Reques
 	keywordArray := strings.Split(keywords, ",")
 
 	// Handle new search
-	gossiper.searchFile(keywordArray, common.DefaultBudget)
+	gossiper.searchFile(keywordArray, DefaultBudget)
 	w.WriteHeader(http.StatusOK)
 }
 

@@ -2,14 +2,13 @@ package gossipernode
 
 import (
 	"github.com/dedis/protobuf"
-	"github.com/paulnicolet/tibcoin/common"
 )
 
 func (gossiper *Gossiper) CLIRoutine(channel <-chan *Packet) {
 	for {
 		packet := <-channel
 		// Decode message
-		clientPacket := common.ClientPacket{}
+		clientPacket := ClientPacket{}
 		err := protobuf.Decode(packet.payload, &clientPacket)
 		if err != nil {
 			// gossiper.errLogger.Printf("Error decoding message: %v\n", err)
@@ -20,7 +19,7 @@ func (gossiper *Gossiper) CLIRoutine(channel <-chan *Packet) {
 	}
 }
 
-func (gossiper *Gossiper) handleCLI(clientPacket *common.ClientPacket) {
+func (gossiper *Gossiper) handleCLI(clientPacket *ClientPacket) {
 	if clientPacket.NewMessage != nil {
 		gossiper.sendNewMessage(clientPacket.NewMessage.Message)
 	} else if clientPacket.NewName != nil {

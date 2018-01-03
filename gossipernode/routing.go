@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/dedis/protobuf"
-	"github.com/paulnicolet/tibcoin/common"
 )
 
 type NextHop struct {
@@ -21,7 +20,7 @@ func (gossiper *Gossiper) RouteRumoringRoutine() {
 
 	for {
 		gossiper.nameMutex.Lock()
-		rumor := &common.RumorMessage{Origin: gossiper.name, ID: gossiper.getID()}
+		rumor := &RumorMessage{Origin: gossiper.name, ID: gossiper.getID()}
 		gossiper.nameMutex.Unlock()
 
 		gossiper.storeRumor(rumor)
@@ -40,7 +39,7 @@ func (gossiper *Gossiper) RouteRumoringRoutine() {
 
 // --------------------------------- Helpers -------------------------------- //
 
-func (gossiper *Gossiper) updateRoutingTable(rumor *common.RumorMessage, relay *net.UDPAddr) {
+func (gossiper *Gossiper) updateRoutingTable(rumor *RumorMessage, relay *net.UDPAddr) {
 	gossiper.messagesMutex.Lock()
 	defer gossiper.messagesMutex.Unlock()
 
@@ -82,7 +81,7 @@ func (gossiper *Gossiper) getNextHop(peer string) (*net.UDPAddr, bool) {
 	return nextHop.Hop, true
 }
 
-func (gossiper *Gossiper) routePrivatePacket(privatePacket *common.PrivatePacket) (bool, error) {
+func (gossiper *Gossiper) routePrivatePacket(privatePacket *PrivatePacket) (bool, error) {
 	// Decrease hop limit
 	privatePacket.HopLimit = privatePacket.HopLimit - 1
 
@@ -110,7 +109,7 @@ func (gossiper *Gossiper) routePrivatePacket(privatePacket *common.PrivatePacket
 	return false, nil
 }
 
-func (gossiper *Gossiper) sendPrivateNoTimeout(privatePacket *common.PrivatePacket, peer string) error {
+func (gossiper *Gossiper) sendPrivateNoTimeout(privatePacket *PrivatePacket, peer string) error {
 	packet := gossiper.unpackPrivate(privatePacket)
 
 	// Get next hop
@@ -130,13 +129,13 @@ func (gossiper *Gossiper) sendPrivateNoTimeout(privatePacket *common.PrivatePack
 	return err
 }
 
-func (gossiper *Gossiper) isRoutingRumor(rumor *common.RumorMessage) bool {
+func (gossiper *Gossiper) isRoutingRumor(rumor *RumorMessage) bool {
 	return rumor.Text == ""
 }
 
-func (gossiper *Gossiper) sendRumorNoTimeout(rumor *common.RumorMessage, peer *Peer) error {
+func (gossiper *Gossiper) sendRumorNoTimeout(rumor *RumorMessage, peer *Peer) error {
 	// Mashall message
-	packet := common.GossipPacket{Rumor: rumor}
+	packet := GossipPacket{Rumor: rumor}
 	buffer, err := protobuf.Encode(&packet)
 	if err != nil {
 		return err
@@ -146,8 +145,8 @@ func (gossiper *Gossiper) sendRumorNoTimeout(rumor *common.RumorMessage, peer *P
 	return err
 }
 
-func (gossiper *Gossiper) packPrivateMessage(msg *common.PrivateMessage) *common.PrivatePacket {
-	return &common.PrivatePacket{
+func (gossiper *Gossiper) packPrivateMessage(msg *PrivateMessage) *PrivatePacket {
+	return &PrivatePacket{
 		Origin:         msg.Origin,
 		Destination:    msg.Destination,
 		HopLimit:       msg.HopLimit,
@@ -155,8 +154,8 @@ func (gossiper *Gossiper) packPrivateMessage(msg *common.PrivateMessage) *common
 	}
 }
 
-func (gossiper *Gossiper) packPrivateRequest(request *common.DataRequest) *common.PrivatePacket {
-	return &common.PrivatePacket{
+func (gossiper *Gossiper) packPrivateRequest(request *DataRequest) *PrivatePacket {
+	return &PrivatePacket{
 		Origin:      request.Origin,
 		Destination: request.Destination,
 		HopLimit:    request.HopLimit,
@@ -164,17 +163,8 @@ func (gossiper *Gossiper) packPrivateRequest(request *common.DataRequest) *commo
 	}
 }
 
-func (gossiper *Gossiper) packBlockRequest(request *common.BlockRequest) *common.PrivatePacket {
-	return &common.PrivatePacket{
-		Origin:       request.Origin,
-		Destination:  request.Destination,
-		HopLimit:     request.HopLimit,
-		BlockRequest: request,
-	}
-}
-
-func (gossiper *Gossiper) packPrivateReply(reply *common.DataReply) *common.PrivatePacket {
-	return &common.PrivatePacket{
+func (gossiper *Gossiper) packPrivateReply(reply *DataReply) *PrivatePacket {
+	return &PrivatePacket{
 		Origin:      reply.Origin,
 		Destination: reply.Destination,
 		HopLimit:    reply.HopLimit,
@@ -182,8 +172,8 @@ func (gossiper *Gossiper) packPrivateReply(reply *common.DataReply) *common.Priv
 	}
 }
 
-func (gossiper *Gossiper) packPrivateSearchReply(reply *common.SearchReply) *common.PrivatePacket {
-	return &common.PrivatePacket{
+func (gossiper *Gossiper) packPrivateSearchReply(reply *SearchReply) *PrivatePacket {
+	return &PrivatePacket{
 		Origin:      reply.Origin,
 		Destination: reply.Destination,
 		HopLimit:    reply.HopLimit,
@@ -191,29 +181,20 @@ func (gossiper *Gossiper) packPrivateSearchReply(reply *common.SearchReply) *com
 	}
 }
 
-func (gossiper *Gossiper) packBlockReply(reply *common.BlockReply) *common.PrivatePacket {
-	return &common.PrivatePacket{
-		Origin:      reply.Origin,
-		Destination: reply.Destination,
-		HopLimit:    reply.HopLimit,
-		BlockReply:  reply,
-	}
-}
-
-func (gossiper *Gossiper) unpackPrivate(privatePacket *common.PrivatePacket) *common.GossipPacket {
-	var packet common.GossipPacket
+func (gossiper *Gossiper) unpackPrivate(privatePacket *PrivatePacket) *GossipPacket {
+	var packet GossipPacket
 	if privatePacket.PrivateMessage != nil {
 		privatePacket.PrivateMessage.HopLimit = privatePacket.HopLimit
-		packet = common.GossipPacket{Private: privatePacket.PrivateMessage}
+		packet = GossipPacket{Private: privatePacket.PrivateMessage}
 	} else if privatePacket.DataRequest != nil {
 		privatePacket.DataRequest.HopLimit = privatePacket.HopLimit
-		packet = common.GossipPacket{DataRequest: privatePacket.DataRequest}
+		packet = GossipPacket{DataRequest: privatePacket.DataRequest}
 	} else if privatePacket.DataReply != nil {
 		privatePacket.DataReply.HopLimit = privatePacket.HopLimit
-		packet = common.GossipPacket{DataReply: privatePacket.DataReply}
+		packet = GossipPacket{DataReply: privatePacket.DataReply}
 	} else {
 		privatePacket.SearchReply.HopLimit = privatePacket.HopLimit
-		packet = common.GossipPacket{SearchReply: privatePacket.SearchReply}
+		packet = GossipPacket{SearchReply: privatePacket.SearchReply}
 	}
 
 	return &packet

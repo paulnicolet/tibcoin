@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/dedis/protobuf"
-	"github.com/paulnicolet/tibcoin/blockchain"
-	"github.com/paulnicolet/tibcoin/common"
 )
 
 // -------------------------------- Routines -------------------------------- //
@@ -23,7 +21,7 @@ func (gossiper *Gossiper) AntiEntropyRoutine() {
 
 		if peer != nil {
 			// Send status
-			packet := common.GossipPacket{Status: gossiper.getStatus()}
+			packet := GossipPacket{Status: gossiper.getStatus()}
 
 			buffer, err := protobuf.Encode(&packet)
 			if err != nil {
@@ -50,7 +48,7 @@ func (gossiper *Gossiper) GossiperRoutine(
 		packet := <-gossipChannel
 
 		// Decode message
-		gossipPacket := common.GossipPacket{}
+		gossipPacket := GossipPacket{}
 		err := protobuf.Decode(packet.payload, &gossipPacket)
 		if err != nil {
 			// gossiper.errLogger.Printf("Error decoding message: %v\n", err)
@@ -129,7 +127,7 @@ func (gossiper *Gossiper) handleRumor(rumorPacket *GossiperPacketSender) error {
 
 	// Ack with status
 	if !gossiper.isRoutingRumor(rumor) {
-		packet := common.GossipPacket{Status: gossiper.getStatus()}
+		packet := GossipPacket{Status: gossiper.getStatus()}
 		buffer, err := protobuf.Encode(&packet)
 		if err != nil {
 			return err
@@ -218,7 +216,7 @@ func (gossiper *Gossiper) handleStatus(statusPacket *GossiperPacketSender) error
 			}
 		}
 
-		buffer, err := protobuf.Encode(&common.GossipPacket{Status: gossiper.getStatus()})
+		buffer, err := protobuf.Encode(&GossipPacket{Status: gossiper.getStatus()})
 		if err != nil {
 			return err
 		}
@@ -249,7 +247,7 @@ func (gossiper *Gossiper) handleStatus(statusPacket *GossiperPacketSender) error
 func (gossiper *Gossiper) handleTimeout(peer *Peer, timer *time.Timer) {
 	// Make sure the ack did not arrive in the meantime
 	peer.mutex.Lock()
-	var rumor *common.RumorMessage
+	var rumor *RumorMessage
 	for i, timerContainer := range peer.timers {
 		if timerContainer.timer == timer {
 			timer.Stop()
@@ -324,9 +322,9 @@ func (gossiper *Gossiper) pickNextPeer(blackList []*net.UDPAddr) *Peer {
 	return nil
 }
 
-func (gossiper *Gossiper) sendRumorWithTimeout(rumor *common.RumorMessage, peer *Peer) error {
+func (gossiper *Gossiper) sendRumorWithTimeout(rumor *RumorMessage, peer *Peer) error {
 	// Mashall message
-	packet := common.GossipPacket{Rumor: rumor}
+	packet := GossipPacket{Rumor: rumor}
 	buffer, err := protobuf.Encode(&packet)
 	if err != nil {
 		return err
@@ -362,7 +360,7 @@ func (gossiper *Gossiper) sendRumorWithTimeout(rumor *common.RumorMessage, peer 
 	return nil
 }
 
-func (gossiper *Gossiper) storeRumor(rumor *common.RumorMessage) bool {
+func (gossiper *Gossiper) storeRumor(rumor *RumorMessage) bool {
 	// Lock the messages map
 	gossiper.messagesMutex.Lock()
 	defer gossiper.messagesMutex.Unlock()
@@ -397,7 +395,7 @@ func (gossiper *Gossiper) storeRumor(rumor *common.RumorMessage) bool {
 	return true
 }
 
-func (gossiper *Gossiper) rumorIsMissing(status *common.StatusPacket) bool {
+func (gossiper *Gossiper) rumorIsMissing(status *StatusPacket) bool {
 	gossiper.messagesMutex.Lock()
 	defer gossiper.messagesMutex.Unlock()
 
@@ -412,7 +410,7 @@ func (gossiper *Gossiper) rumorIsMissing(status *common.StatusPacket) bool {
 	return false
 }
 
-func (gossiper *Gossiper) getPeerMissingRumor(status *common.StatusPacket) *common.RumorMessage {
+func (gossiper *Gossiper) getPeerMissingRumor(status *StatusPacket) *RumorMessage {
 	// Build a map out of the status
 	statusesMap := make(map[string]uint32)
 	for _, peerStatus := range status.Want {
@@ -440,19 +438,19 @@ func (gossiper *Gossiper) getPeerMissingRumor(status *common.StatusPacket) *comm
 	return nil
 }
 
-func (gossiper *Gossiper) getStatus() *common.StatusPacket {
+func (gossiper *Gossiper) getStatus() *StatusPacket {
 	gossiper.messagesMutex.Lock()
 	defer gossiper.messagesMutex.Unlock()
 
-	var status []common.PeerStatus
+	var status []PeerStatus
 	for name, history := range gossiper.messages {
-		status = append(status, common.PeerStatus{Identifier: name, NextID: history.lastConsecutiveID + 1})
+		status = append(status, PeerStatus{Identifier: name, NextID: history.lastConsecutiveID + 1})
 	}
 
-	return &common.StatusPacket{Want: status}
+	return &StatusPacket{Want: status}
 }
 
-func (gossiper *Gossiper) processAck(peer *Peer, status *common.StatusPacket) *common.RumorMessage {
+func (gossiper *Gossiper) processAck(peer *Peer, status *StatusPacket) *RumorMessage {
 	peer.mutex.Lock()
 	defer peer.mutex.Unlock()
 
@@ -473,6 +471,6 @@ func (gossiper *Gossiper) processAck(peer *Peer, status *common.StatusPacket) *c
 	return nil
 }
 
-func (gossiper *Gossiper) canForward(rumor *common.RumorMessage) bool {
+func (gossiper *Gossiper) canForward(rumor *RumorMessage) bool {
 	return !gossiper.noforward || (gossiper.noforward && gossiper.isRoutingRumor(rumor))
 }
