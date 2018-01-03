@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"math/big"
+	"time"
 )
 
 const MaxBlockSize = 1000000
@@ -11,6 +12,22 @@ const MaxBlockSize = 1000000
 type Sig struct {
 	R *big.Int
 	S *big.Int
+}
+
+type Block struct {
+	TimeStamp int64
+	Height    int
+	Nonce     int
+	PrevHash  []byte
+	Txs       map[[]byte]Transaction
+}
+
+const CoinBase = 50
+const GenesisBlock = Block{
+	TimeStamp: new time.Date(2018, 1, 3, 11, 00, 00, 00, time.UTC),
+	Height: 0,
+	Nonce: 0,
+	PrevHash: make([]byte, 0),
 }
 
 type Address struct {
