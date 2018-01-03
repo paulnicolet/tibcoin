@@ -1,11 +1,8 @@
 package gossipernode
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"crypto/rand"
-
-	"github.com/paulnicolet/tibcoin/common"
 )
 
 /*
@@ -30,7 +27,7 @@ type Transaction struct {
 	inputs  []TxInput
 	outputs []TxOutput
 	// Transaction signature
-	sig common.Sig
+	sig Sig
 	// Public key needed to check signature against UTXOs
 	publicKey ecdsa.PublicKey
 }
@@ -42,10 +39,10 @@ type TxInput struct {
 
 type TxOutput struct {
 	value uint
-	to    common.Address
+	to    string
 }
 
-func (gossiper *Gossiper) NewTransaction(to common.Address, value uint) (*Transaction, error) {
+func (gossiper *Gossiper) NewTransaction(to string, value uint) (*Transaction, error) {
 	// Scan blockchain to gather enough UTXO to pay for "value" coins
 	// Gather UTXOs in inputs
 
@@ -65,7 +62,7 @@ func (gossiper *Gossiper) VerifyTransaction(tx *Transaction) bool {
 	// Each output must be in legal money range
 	// Reject if tx already present in the pool
 	// Check that UTXO of each input are not already used by tx in the pool
-	// Look for UTXOs in the chain
+	// Look for UTXOs in the main chain, or if in fork or orphan block, put in orphan txs
 	// Check that input values are in legal money range
 	// Check that sum of input > sum of outputs
 	// Check that tx fee is enough to get into an empty block
@@ -79,13 +76,13 @@ func (gossiper *Gossiper) signTx(tx *Transaction) (*Transaction, error) {
 		return nil, err
 	}
 
-	tx.sig = common.Sig{R: r, S: s}
+	tx.sig = Sig{R: r, S: s}
 	return tx, nil
 }
 
 func (gossiper *Gossiper) checkSig(tx *Transaction) bool {
 	// Check tx signature against each UTXO
-	address := common.PublicKeyToAddress(tx.publicKey)
+	address := PublicKeyToAddress(tx.publicKey)
 	signable := tx.getSignable()
 
 	for _, input := range tx.inputs {
@@ -95,7 +92,7 @@ func (gossiper *Gossiper) checkSig(tx *Transaction) bool {
 		}
 
 		// Check receiver address
-		if !bytes.Equal(output.to.PubKeyHash[:], address.PubKeyHash[:]) {
+		if !(output.to == address) {
 			return false
 		}
 

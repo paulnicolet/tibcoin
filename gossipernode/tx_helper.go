@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"strconv"
-
-	"github.com/paulnicolet/tibcoin/common"
 )
 
 func (tx *Transaction) getSignable() []byte {
@@ -29,7 +27,7 @@ func (tx *Transaction) equals(other *Transaction) bool {
 		return false
 	}
 
-	if !common.PublicKeyEqual(tx.publicKey, other.publicKey) {
+	if !PublicKeyEqual(tx.publicKey, other.publicKey) {
 		return false
 	}
 
@@ -68,11 +66,11 @@ func (in *TxInput) getOutput() (*TxOutput, error) {
 
 func (out *TxOutput) hash() []byte {
 	h := sha256.New()
-	h.Write(out.to.PubKeyHash[:])
+	h.Write([]byte(out.to))
 	h.Write([]byte(strconv.Itoa(int(out.value))))
 	return h.Sum(nil)
 }
 
 func (out *TxOutput) equals(other *TxOutput) bool {
-	return bytes.Equal(out.to.PubKeyHash[:], other.to.PubKeyHash[:]) && out.value == other.value
+	return (out.to == other.to) && out.value == other.value
 }

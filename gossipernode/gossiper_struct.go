@@ -12,7 +12,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/paulnicolet/tibcoin/blockchain.go"
 	"github.com/paulnicolet/tibcoin/common"
 )
 
@@ -82,12 +81,11 @@ type Gossiper struct {
 	recentRequestsMutex    *sync.Mutex
 	recentReceivedRequests []*ReceivedSearchRequest
 	privateKey             *ecdsa.PrivateKey
-
-	topBlock        []byte
-	blocks          map[[]byte]*Block
-	forks           [][]byte
-	blockOrphanPool [][]byte
-	txPool          []Transaction
+	topBlock               []byte
+	blocks                 map[[32]byte]*Block
+	forks                  [][]byte
+	blockOrphanPool        [][]byte
+	txPool                 []Transaction
 }
 
 func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDPAddr, peersAddr []*net.UDPAddr, rtimer *time.Duration, noforward bool) (*Gossiper, error) {
@@ -183,6 +181,10 @@ func (gossiper *Gossiper) Start() error {
 
 	// Spawn route rumoring routine
 	go gossiper.RouteRumoringRoutine()
+
+	add := PublicKeyToAddress(gossiper.privateKey.PublicKey)
+
+	gossiper.errLogger.Println(add)
 
 	select {}
 }
