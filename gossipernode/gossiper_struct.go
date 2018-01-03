@@ -205,8 +205,7 @@ func (gossiper *Gossiper) Start() error {
 	go gossiper.RouteRumoringRoutine()
 
 	add := PublicKeyToAddress(gossiper.privateKey.PublicKey)
-
-	gossiper.errLogger.Println(add)
+	gossiper.errLogger.Printf("Tibcoin address %s", add)
 
 	select {}
 }
