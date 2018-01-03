@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"math/rand"
 	"time"
-
-	"github.com/paulnicolet/tibcoin/common"
 )
 
 type DownloadState struct {
@@ -44,7 +42,7 @@ func (gossiper *Gossiper) handleDataReply(packet *GossiperPacketSender) error {
 	return nil
 }
 
-func (gossiper *Gossiper) processDataReply(reply *common.DataReply) error {
+func (gossiper *Gossiper) processDataReply(reply *DataReply) error {
 	// Process metafile if it is one
 	if gossiper.processMetaFile(reply) {
 		gossiper.errLogger.Println("METAFILE")
@@ -77,7 +75,7 @@ func (gossiper *Gossiper) processDataReply(reply *common.DataReply) error {
 	return nil
 }
 
-func (gossiper *Gossiper) processMetaFile(reply *common.DataReply) bool {
+func (gossiper *Gossiper) processMetaFile(reply *DataReply) bool {
 	gossiper.currentFileSearchMutex.Lock()
 	for filename, state := range gossiper.currentFileSearch.Files {
 		// Is it a metafile ?
@@ -103,7 +101,7 @@ func (gossiper *Gossiper) processMetaFile(reply *common.DataReply) bool {
 			gossiper.currentFileSearchMutex.Unlock()
 
 			// Do we already have all the chunks ?
-			nChunk := len(state.MetaFile) / common.HashSize
+			nChunk := len(state.MetaFile) / HashSize
 			if state.AvailableChunks == uint64(nChunk) {
 				// It's a match
 				gossiper.errLogger.Println("New match")
@@ -113,7 +111,7 @@ func (gossiper *Gossiper) processMetaFile(reply *common.DataReply) bool {
 
 				// Stop request if necessary
 				gossiper.currentFileSearchMutex.Lock()
-				if nMatches >= common.MatchThreshold {
+				if nMatches >= MatchThreshold {
 					KillTimeout(gossiper.currentFileSearch.Timeout)
 				}
 
@@ -131,7 +129,7 @@ func (gossiper *Gossiper) processMetaFile(reply *common.DataReply) bool {
 
 func (gossiper *Gossiper) launchDownload(state *FileSearchState) {
 	// Create file
-	file := &common.File{
+	file := &File{
 		Name:     state.FileName,
 		MetaFile: state.MetaFile,
 		MetaHash: state.MetaHash,
@@ -153,7 +151,7 @@ func (gossiper *Gossiper) launchDownload(state *FileSearchState) {
 
 	for chunkIdx, _ := range state.Chunks {
 		timeout := &Timeout{
-			Ticker: time.NewTicker(common.DataRequestRepeatDelay * time.Second),
+			Ticker: time.NewTicker(DataRequestRepeatDelay * time.Second),
 			Killer: make(chan bool),
 		}
 
@@ -168,14 +166,14 @@ func (gossiper *Gossiper) downloadChunk(timeout *Timeout, download *DownloadStat
 	peers := download.SearchState.Chunks[chunkIdx]
 	peer := peers[rand.Intn(len(peers))]
 
-	lowIdx := chunkIdx * common.HashSize
-	highIdx := (chunkIdx + 1) * common.HashSize
+	lowIdx := chunkIdx * HashSize
+	highIdx := (chunkIdx + 1) * HashSize
 	hash := download.SearchState.MetaFile[lowIdx:highIdx]
 
-	request := &common.DataRequest{
+	request := &DataRequest{
 		Origin:      gossiper.name,
 		Destination: peer,
-		HopLimit:    common.HopLimit,
+		HopLimit:    HopLimit,
 		FileName:    download.SearchState.FileName,
 		HashValue:   hash,
 	}
@@ -199,7 +197,7 @@ func (gossiper *Gossiper) downloadChunk(timeout *Timeout, download *DownloadStat
 	}
 }
 
-func (gossiper *Gossiper) storeChunk(reply *common.DataReply, file *common.File, state *DownloadState) error {
+func (gossiper *Gossiper) storeChunk(reply *DataReply, file *File, state *DownloadState) error {
 	// Get chunk index
 	chunkIdx, err := gossiper.getChunkIdx(file, reply.HashValue)
 	if err != nil {
@@ -218,7 +216,7 @@ func (gossiper *Gossiper) storeChunk(reply *common.DataReply, file *common.File,
 	gossiper.errLogger.Printf("Storing chunk idx %d of file %s", chunkIdx, reply.FileName)
 	file.Content[chunkIdx] = reply.Data
 
-	nChunk := len(file.MetaFile) / common.HashSize
+	nChunk := len(file.MetaFile) / HashSize
 	if len(file.Content) >= nChunk {
 		// Archive file
 		gossiper.archiveFile(file)

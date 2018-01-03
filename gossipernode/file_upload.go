@@ -3,8 +3,6 @@ package gossipernode
 import (
 	"bytes"
 	"fmt"
-
-	"github.com/paulnicolet/tibcoin/common"
 )
 
 func (gossiper *Gossiper) DataRequestRoutine(channel <-chan *GossiperPacketSender) {
@@ -38,7 +36,7 @@ func (gossiper *Gossiper) handleDataRequest(packet *GossiperPacketSender) error 
 	return nil
 }
 
-func (gossiper *Gossiper) processDataRequest(request *common.DataRequest) error {
+func (gossiper *Gossiper) processDataRequest(request *DataRequest) error {
 	// Get corresponding file
 	gossiper.filesMutex.Lock()
 	file, in := gossiper.files[request.FileName]
@@ -50,11 +48,11 @@ func (gossiper *Gossiper) processDataRequest(request *common.DataRequest) error 
 	// Send metafile or chunk
 	if bytes.Equal(request.HashValue, file.MetaHash) {
 		// Send metafile
-		reply := &common.DataReply{
+		reply := &DataReply{
 			Origin:      gossiper.name,
 			Destination: request.Origin,
 			FileName:    request.FileName,
-			HopLimit:    common.HopLimit,
+			HopLimit:    HopLimit,
 			HashValue:   file.MetaHash,
 			Data:        file.MetaFile,
 		}
@@ -69,7 +67,7 @@ func (gossiper *Gossiper) processDataRequest(request *common.DataRequest) error 
 	return nil
 }
 
-func (gossiper *Gossiper) sendChunk(request *common.DataRequest) error {
+func (gossiper *Gossiper) sendChunk(request *DataRequest) error {
 	// Get file
 	file, in := gossiper.getFile(request.FileName)
 	if !in {
@@ -84,11 +82,11 @@ func (gossiper *Gossiper) sendChunk(request *common.DataRequest) error {
 
 	// Send data
 	data := gossiper.getChunk(file, uint64(chunkIdx))
-	reply := &common.DataReply{
+	reply := &DataReply{
 		Origin:      gossiper.name,
 		Destination: request.Origin,
 		FileName:    request.FileName,
-		HopLimit:    common.HopLimit,
+		HopLimit:    HopLimit,
 		HashValue:   request.HashValue,
 		Data:        data,
 	}

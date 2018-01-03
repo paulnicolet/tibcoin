@@ -76,6 +76,25 @@ func (tx *Transaction) equals(other *Transaction) bool {
 	return true
 }
 
+func (tx *Transaction) size() int {
+	size := 0
+
+	// Inputs
+	for _, input := range tx.inputs {
+		size += input.size()
+	}
+
+	// Outputs
+	for _, output := range tx.outputs {
+		size += output.size()
+	}
+
+	// Suppose a big int sizes 8 bytes
+	size += (8 * 4)
+
+	return size
+}
+
 // Transaction inputs internals
 func (in *TxInput) hash() [32]byte {
 	h := sha256.New()
@@ -112,7 +131,7 @@ func (gossiper *Gossiper) getOutput(in *TxInput) (*TxOutput, error) {
 				if int(in.outputIdx) < len(tx.outputs) {
 					return tx.outputs[in.outputIdx], nil
 				} else {
-					return nil, errors.New(fmt.Sprintf("Transaction found (hash = %x) but not enough output: expected at least %d, got %d.", txHash[:], in.outputIdx + 1, len(tx.outputs)))
+					return nil, errors.New(fmt.Sprintf("Transaction found (hash = %x) but not enough output: expected at least %d, got %d.", txHash[:], in.outputIdx+1, len(tx.outputs)))
 				}
 			}
 		}
@@ -126,6 +145,55 @@ func (gossiper *Gossiper) getOutput(in *TxInput) (*TxOutput, error) {
 	return nil, errors.New(fmt.Sprintf("Transaction not found in main branch (hash = %x).", in.outputTxHash[:]))
 }
 
+func (gossiper *Gossiper) alreadySpent(outputs []*TxOutputLocation) bool {
+	// Get first hash
+	gossiper.topBlockMutex.Lock()
+	topBlockHash := gossiper.topBlock
+	gossiper.topBlockMutex.Unlock()
+
+	// Get block
+	gossiper.blocksMutex.Lock()
+	currentBlock, blockExists := gossiper.blocks[topBlockHash]
+	gossiper.blocksMutex.Unlock()
+
+	// Look for spent outputs
+	for blockExists {
+		for _, tx := range currentBlock.Txs {
+			for _, input := range tx.inputs {
+				for _, outputLocation := range outputs {
+					if bytes.Equal(outputLocation.outputTxHash[:], input.outputTxHash[:]) && outputLocation.outputIdx == input.outputIdx {
+						return true
+					}
+				}
+			}
+		}
+
+		gossiper.blocksMutex.Lock()
+		currentBlock, blockExists = gossiper.blocks[currentBlock.PrevHash]
+		gossiper.blocksMutex.Unlock()
+	}
+
+	// Look in the pool
+	gossiper.txPoolMutex.Lock()
+	for _, tx := range gossiper.txPool {
+		for _, input := range tx.inputs {
+			for _, outputLocation := range outputs {
+				if bytes.Equal(outputLocation.outputTxHash[:], input.outputTxHash[:]) && outputLocation.outputIdx == input.outputIdx {
+					return true
+				}
+			}
+		}
+	}
+	gossiper.txPoolMutex.Unlock()
+
+	return false
+}
+
+func (in *TxInput) size() int {
+	// Hardcode input size
+	return 4 + len(in.outputTxHash)
+}
+
 // Transaction outputs internals
 
 func (out *TxOutput) hash() [32]byte {
@@ -137,4 +205,9 @@ func (out *TxOutput) hash() [32]byte {
 
 func (out *TxOutput) equals(other *TxOutput) bool {
 	return (out.to == other.to) && out.value == other.value
+}
+
+func (out *TxOutput) size() int {
+	// Hardcode output size
+	return 4 + len([]byte(out.to))
 }

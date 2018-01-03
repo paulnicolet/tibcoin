@@ -12,8 +12,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/paulnicolet/tibcoin/common"
 )
 
 type Packet struct {
@@ -23,15 +21,15 @@ type Packet struct {
 
 type GossiperPacketSender struct {
 	from   *net.UDPAddr
-	packet *common.GossipPacket
+	packet *GossipPacket
 }
 
 type PeerHistory struct {
 	peerID            string
 	lastConsecutiveID uint32
 	maxReceivedID     uint32
-	messages          map[uint32]*common.RumorMessage
-	privateChat       []*common.PrivateMessage
+	messages          map[uint32]*RumorMessage
+	privateChat       []*PrivateMessage
 }
 
 type Peer struct {
@@ -43,7 +41,7 @@ type Peer struct {
 type TimerContainer struct {
 	ack   chan (bool)
 	timer *time.Timer
-	rumor *common.RumorMessage
+	rumor *RumorMessage
 }
 
 // TODO use timeouts everywhere
@@ -61,7 +59,7 @@ type Gossiper struct {
 	nextID                 uint32
 	messages               map[string]*PeerHistory
 	messagesMutex          *sync.Mutex
-	globalChat             []*common.RumorMessage
+	globalChat             []*RumorMessage
 	globalChatMutex        *sync.Mutex
 	peers                  map[string]*Peer
 	peersMutex             *sync.Mutex
@@ -72,7 +70,7 @@ type Gossiper struct {
 	rtimer                 *time.Duration
 	noforward              bool
 	filesMutex             *sync.Mutex
-	files                  map[string]*common.File
+	files                  map[string]*File
 	downloadsMutex         *sync.Mutex
 	downloads              map[string]*DownloadState
 	currentFileSearchMutex *sync.Mutex
@@ -100,7 +98,7 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 	stdLogger := log.New(os.Stdout, "", 0)
 	errLogger := log.New(os.Stderr, fmt.Sprintf("[Gossiper: %s] ", name), log.Ltime|log.Lshortfile)
 
-	uiAddr, err := net.ResolveUDPAddr("udp", common.LocalIP(uiPort))
+	uiAddr, err := net.ResolveUDPAddr("udp", LocalIP(uiPort))
 	uiConn, err := net.ListenUDP("udp", uiAddr)
 	if err != nil {
 		return nil, err
@@ -139,7 +137,7 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 		nextID:                 1,
 		messages:               make(map[string]*PeerHistory, 0),
 		messagesMutex:          &sync.Mutex{},
-		globalChat:             make([]*common.RumorMessage, 0, 0),
+		globalChat:             make([]*RumorMessage, 0, 0),
 		globalChatMutex:        &sync.Mutex{},
 		peers:                  peers,
 		peersMutex:             &sync.Mutex{},
@@ -150,7 +148,7 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 		rtimer:                 rtimer,
 		noforward:              noforward,
 		filesMutex:             &sync.Mutex{},
-		files:                  make(map[string]*common.File),
+		files:                  make(map[string]*File),
 		downloadsMutex:         &sync.Mutex{},
 		downloads:              make(map[string]*DownloadState),
 		currentFileSearchMutex: &sync.Mutex{},
@@ -226,7 +224,7 @@ func (gossiper *Gossiper) Start() error {
 func (gossiper *Gossiper) Listen(conn *net.UDPConn, channel chan<- *Packet) {
 	for {
 		// Read from connection
-		buffer := make([]byte, 2*common.ChunkSize)
+		buffer := make([]byte, 2*ChunkSize)
 		_, sender, err := conn.ReadFromUDP(buffer)
 		if err != nil {
 			gossiper.errLogger.Println(err.Error())
@@ -246,7 +244,7 @@ func (gossiper *Gossiper) getID() uint32 {
 func (gossiper *Gossiper) getHistory(peerID string) *PeerHistory {
 	history, in := gossiper.messages[peerID]
 	if !in {
-		history = &PeerHistory{peerID: peerID, lastConsecutiveID: 0, maxReceivedID: 0, messages: make(map[uint32]*common.RumorMessage), privateChat: make([]*common.PrivateMessage, 0)}
+		history = &PeerHistory{peerID: peerID, lastConsecutiveID: 0, maxReceivedID: 0, messages: make(map[uint32]*RumorMessage), privateChat: make([]*PrivateMessage, 0)}
 		gossiper.messages[peerID] = history
 	}
 

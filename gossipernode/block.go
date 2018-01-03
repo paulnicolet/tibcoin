@@ -7,7 +7,8 @@ import (
 	"time"
 )
 
-const MaxBlockSize = 1000000
+const MaxBlockSize = 500000
+const MaxCoins = 1000000000
 
 type Block struct {
 	Timestamp int64

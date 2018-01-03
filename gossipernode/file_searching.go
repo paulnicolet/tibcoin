@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/dedis/protobuf"
-	"github.com/paulnicolet/tibcoin/common"
 )
 
 type FileSearchState struct {
@@ -26,7 +25,7 @@ type FileSearchRequest struct {
 
 type ReceivedSearchRequest struct {
 	Timestamp time.Time
-	Request   *common.SearchRequest
+	Request   *SearchRequest
 }
 
 func (gossiper *Gossiper) SearchReplyRoutine(channel <-chan *GossiperPacketSender) {
@@ -59,7 +58,7 @@ func (gossiper *Gossiper) handleSearchReply(packet *GossiperPacketSender) error 
 	return nil
 }
 
-func (gossiper *Gossiper) processSearchReply(reply *common.SearchReply) error {
+func (gossiper *Gossiper) processSearchReply(reply *SearchReply) error {
 	gossiper.errLogger.Printf("New search reply %v", reply.Origin)
 
 	gossiper.currentFileSearchMutex.Lock()
@@ -75,17 +74,17 @@ func (gossiper *Gossiper) processSearchReply(reply *common.SearchReply) error {
 
 		if state.MetaFile == nil {
 			// Request metafile
-			request := &common.DataRequest{
+			request := &DataRequest{
 				Origin:      gossiper.name,
 				Destination: reply.Origin,
-				HopLimit:    common.HopLimit,
+				HopLimit:    HopLimit,
 				FileName:    result.FileName,
 				HashValue:   result.MetafileHash,
 			}
 
 			// New ticker to repeat request
 			timeout := &Timeout{
-				Ticker: time.NewTicker(common.DataRequestRepeatDelay * time.Second),
+				Ticker: time.NewTicker(DataRequestRepeatDelay * time.Second),
 				Killer: make(chan bool),
 			}
 			state.MetaFileRequests[reply.Origin] = timeout
@@ -99,7 +98,7 @@ func (gossiper *Gossiper) processSearchReply(reply *common.SearchReply) error {
 			go gossiper.requestTicker(timeout, privatePacket, reply.Origin)
 		} else {
 			// Do we have all the chunks available ?
-			nChunk := len(state.MetaFile) / common.HashSize
+			nChunk := len(state.MetaFile) / HashSize
 
 			if state.AvailableChunks == uint64(nChunk) {
 				// It's a match
@@ -110,7 +109,7 @@ func (gossiper *Gossiper) processSearchReply(reply *common.SearchReply) error {
 
 				// Stop request if necessary
 				gossiper.currentFileSearchMutex.Lock()
-				if nMatches >= common.MatchThreshold {
+				if nMatches >= MatchThreshold {
 					KillTimeout(gossiper.currentFileSearch.Timeout)
 				}
 
@@ -124,7 +123,7 @@ func (gossiper *Gossiper) processSearchReply(reply *common.SearchReply) error {
 	return nil
 }
 
-func (gossiper *Gossiper) broadcastRequest(request *common.SearchRequest, relay *net.UDPAddr) {
+func (gossiper *Gossiper) broadcastRequest(request *SearchRequest, relay *net.UDPAddr) {
 	gossiper.errLogger.Println("Broadcasting search request")
 	gossiper.peersMutex.Lock()
 	defer gossiper.peersMutex.Unlock()
@@ -154,7 +153,7 @@ func (gossiper *Gossiper) broadcastRequest(request *common.SearchRequest, relay 
 		request.Budget = finalBudget
 
 		// Send message
-		packet := &common.GossipPacket{SearchRequest: request}
+		packet := &GossipPacket{SearchRequest: request}
 		buffer, err := protobuf.Encode(packet)
 
 		_, err = gossiper.gossipConn.WriteToUDP(buffer, peer.addr)
@@ -176,7 +175,7 @@ func (gossiper *Gossiper) repeatSearchRequest(ticker *time.Ticker, tickerKiller 
 
 			gossiper.errLogger.Printf("Sending again request with budget %d", currentBudget)
 
-			request := &common.SearchRequest{
+			request := &SearchRequest{
 				Origin:   gossiper.name,
 				Budget:   currentBudget,
 				Keywords: gossiper.currentFileSearch.Keywords,
@@ -184,7 +183,7 @@ func (gossiper *Gossiper) repeatSearchRequest(ticker *time.Ticker, tickerKiller 
 
 			gossiper.broadcastRequest(request, nil)
 
-			if currentBudget >= common.MaxBudget {
+			if currentBudget >= MaxBudget {
 				gossiper.stdLogger.Println("SEARCH FINISHED")
 				ticker.Stop()
 				return
@@ -197,7 +196,7 @@ func (gossiper *Gossiper) repeatSearchRequest(ticker *time.Ticker, tickerKiller 
 	}
 }
 
-func (gossiper *Gossiper) updateSearchState(result *common.SearchResult, from string, state *FileSearchState) {
+func (gossiper *Gossiper) updateSearchState(result *SearchResult, from string, state *FileSearchState) {
 	for chunkIdx := range result.ChunkMap {
 		_, in := state.Chunks[uint64(chunkIdx)]
 		if !in {

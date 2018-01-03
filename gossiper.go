@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/paulnicolet/tibcoin/common"
 	"github.com/paulnicolet/tibcoin/gossipernode"
 )
 
@@ -62,7 +61,7 @@ func parseInput(args []string) (string, string, string, *net.UDPAddr, []*net.UDP
 
 	// Convert gossipPort to address if necessary
 	if len(strings.Split(*gossipPort, ":")) == 1 {
-		*gossipPort = common.LocalIP(*gossipPort)
+		*gossipPort = gossipernode.LocalIP(*gossipPort)
 	}
 
 	gossipAddr, err := net.ResolveUDPAddr("udp", *gossipPort)

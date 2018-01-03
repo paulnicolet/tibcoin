@@ -8,12 +8,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-
-	"github.com/paulnicolet/tibcoin/common"
 )
 
-func (gossiper *Gossiper) initFile(name string, metafile []byte, metahash []byte) *common.File {
-	return &common.File{
+func (gossiper *Gossiper) initFile(name string, metafile []byte, metahash []byte) *File {
+	return &File{
 		Name:     name,
 		MetaFile: metafile,
 		MetaHash: metahash,
@@ -21,24 +19,24 @@ func (gossiper *Gossiper) initFile(name string, metafile []byte, metahash []byte
 	}
 }
 
-func (gossiper *Gossiper) getFile(filename string) (*common.File, bool) {
+func (gossiper *Gossiper) getFile(filename string) (*File, bool) {
 	gossiper.filesMutex.Lock()
 	defer gossiper.filesMutex.Unlock()
 	file, in := gossiper.files[filename]
 	return file, in
 }
 
-func (gossiper *Gossiper) getChunkHash(file *common.File, idx uint64) []byte {
-	lowIdx := idx * common.HashSize
-	highIdx := (idx + 1) * common.HashSize
+func (gossiper *Gossiper) getChunkHash(file *File, idx uint64) []byte {
+	lowIdx := idx * HashSize
+	highIdx := (idx + 1) * HashSize
 	return file.MetaFile[lowIdx:highIdx]
 }
 
-func (gossiper *Gossiper) getChunkIdx(file *common.File, hash []byte) (uint64, error) {
-	nChunk := len(file.MetaFile) / common.HashSize
+func (gossiper *Gossiper) getChunkIdx(file *File, hash []byte) (uint64, error) {
+	nChunk := len(file.MetaFile) / HashSize
 
 	for chunkIdx := 0; chunkIdx < nChunk; chunkIdx++ {
-		if bytes.Equal(hash, file.MetaFile[chunkIdx*common.HashSize:(chunkIdx+1)*common.HashSize]) {
+		if bytes.Equal(hash, file.MetaFile[chunkIdx*HashSize:(chunkIdx+1)*HashSize]) {
 			return uint64(chunkIdx), nil
 		}
 	}
@@ -46,13 +44,13 @@ func (gossiper *Gossiper) getChunkIdx(file *common.File, hash []byte) (uint64, e
 	return 0, fmt.Errorf("No chunk corresponding to the given hash")
 }
 
-func (gossiper *Gossiper) getChunk(file *common.File, idx uint64) []byte {
+func (gossiper *Gossiper) getChunk(file *File, idx uint64) []byte {
 	return file.Content[idx]
 }
 
-func (gossiper *Gossiper) buildFile(filename string) (*common.File, error) {
+func (gossiper *Gossiper) buildFile(filename string) (*File, error) {
 	// Open file
-	path, err := filepath.Abs(common.FilePath + filename)
+	path, err := filepath.Abs(FilePath + filename)
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -64,7 +62,7 @@ func (gossiper *Gossiper) buildFile(filename string) (*common.File, error) {
 	// Read file by chunk
 	var chunkIdx uint64 = 0
 	for {
-		buffer := make([]byte, common.ChunkSize)
+		buffer := make([]byte, ChunkSize)
 		n, err := f.Read(buffer)
 		if err == io.EOF {
 			break
@@ -86,7 +84,7 @@ func (gossiper *Gossiper) buildFile(filename string) (*common.File, error) {
 	metahash := sha256.Sum256(metafile)
 
 	// Build file structutre
-	file := common.File{
+	file := File{
 		Name:     filename,
 		Content:  content,
 		MetaFile: metafile,
@@ -98,15 +96,15 @@ func (gossiper *Gossiper) buildFile(filename string) (*common.File, error) {
 	return &file, nil
 }
 
-func (gossiper *Gossiper) archiveFile(file *common.File) error {
+func (gossiper *Gossiper) archiveFile(file *File) error {
 	gossiper.stdLogger.Printf("RECONSTRUCTED file %s", file.Name)
-	f, err := os.Create(common.DownloadPath + file.Name)
+	f, err := os.Create(DownloadPath + file.Name)
 	if err != nil {
 		return err
 	}
 
 	var content []byte
-	nChunk := len(file.MetaFile) / common.HashSize
+	nChunk := len(file.MetaFile) / HashSize
 	for i := 0; i < nChunk; i++ {
 		content = append(content, file.Content[uint64(i)]...)
 	}
@@ -129,7 +127,7 @@ func (gossiper *Gossiper) alreadyMatched(filename string, matches []*FileSearchS
 	return false
 }
 
-func (gossiper *Gossiper) requestTicker(timeout *Timeout, privatePacket *common.PrivatePacket, to string) {
+func (gossiper *Gossiper) requestTicker(timeout *Timeout, privatePacket *PrivatePacket, to string) {
 	for {
 		select {
 		case <-timeout.Ticker.C:
