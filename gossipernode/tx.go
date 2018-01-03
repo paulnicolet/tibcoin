@@ -38,7 +38,7 @@ type Transaction struct {
 }
 
 type TxInput struct {
-	outputTxHash []byte
+	outputTxHash [32]byte
 	outputIdx    int
 }
 
@@ -49,7 +49,7 @@ type TxOutput struct {
 
 type TxOutputLocation struct {
 	output       *TxOutput
-	outputTxHash []byte
+	outputTxHash [32]byte
 	outputIdx    int
 }
 
@@ -147,7 +147,8 @@ func (gossiper *Gossiper) computeTxFee(tx *Transaction) (int, error) {
 }
 
 func (gossiper *Gossiper) signTx(tx *Transaction) (*Transaction, error) {
-	r, s, err := ecdsa.Sign(rand.Reader, gossiper.privateKey, tx.getSignable())
+	signable := tx.getSignable()
+	r, s, err := ecdsa.Sign(rand.Reader, gossiper.privateKey, signable[:])
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +174,7 @@ func (gossiper *Gossiper) checkSig(tx *Transaction) bool {
 		}
 
 		// Check signature
-		if !ecdsa.Verify(&tx.publicKey, signable, tx.sig.R, tx.sig.S) {
+		if !ecdsa.Verify(&tx.publicKey, signable[:], tx.sig.R, tx.sig.S) {
 			return false
 		}
 	}
@@ -200,7 +201,7 @@ func (gossiper *Gossiper) FilterSpentOutputs(outputs []*TxOutputLocation) []*TxO
 		for _, tx := range currentBlock.Txs {
 			for _, input := range tx.inputs {
 				for idx, outputLocation := range outputs {
-					if bytes.Equal(outputLocation.outputTxHash, input.outputTxHash) && outputLocation.outputIdx == input.outputIdx {
+					if bytes.Equal(outputLocation.outputTxHash[:], input.outputTxHash[:]) && outputLocation.outputIdx == input.outputIdx {
 						toRemove = append(toRemove, idx)
 					}
 				}

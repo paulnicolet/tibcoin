@@ -25,7 +25,8 @@ func (block *Block) hash() [32]byte {
 	hash.Write(block.PrevHash[:])
 
 	for _, tx := range block.Txs {
-		hash.Write(tx.hash())
+		txHash := tx.hash()
+		hash.Write(txHash[:])
 	}
 
 	return BytesToHash(hash.Sum(nil))
