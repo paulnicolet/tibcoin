@@ -27,6 +27,8 @@ type GossipPacket struct {
 	DataReply     *DataReply
 	SearchRequest *SearchRequest
 	SearchReply   *SearchReply
+	BlockRequest  *BlockRequest
+	BlockReply    *BlockReply
 }
 
 type File struct {
@@ -72,6 +74,23 @@ type SearchResult struct {
 	ChunkMap     []uint64
 }
 
+/* Block chain struct routine */
+
+type BlockRequest struct {
+	Origin     string
+	BlockHash  []byte
+	WaitingInv bool
+}
+
+type BlockReply struct {
+	Origin     string
+	Hash       []byte
+	Block      *Block
+	BlocksHash [][]byte
+}
+
+/* END */
+
 type RumorMessage struct {
 	Origin   string
 	ID       uint32
@@ -105,6 +124,8 @@ type PrivatePacket struct {
 	DataRequest    *DataRequest
 	DataReply      *DataReply
 	SearchReply    *SearchReply
+	BlockRequest   *BlockRequest
+	BlockReply     *BlockReply
 }
 
 // Client structs

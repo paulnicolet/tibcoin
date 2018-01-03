@@ -3,8 +3,6 @@ package gossipernode
 import (
 	"strings"
 	"time"
-
-	"github.com/paulnicolet/tibcoin/common"
 )
 
 func (gossiper *Gossiper) SearchRequestRoutine(channel <-chan *GossiperPacketSender) {
@@ -47,10 +45,10 @@ func (gossiper *Gossiper) handleSearchRequest(packet *GossiperPacketSender) erro
 	}
 
 	// Reply to request
-	reply := &common.SearchReply{
+	reply := &SearchReply{
 		Origin:      gossiper.name,
 		Destination: request.Origin,
-		HopLimit:    common.HopLimit,
+		HopLimit:    HopLimit,
 		Results:     results,
 	}
 
@@ -61,15 +59,15 @@ func (gossiper *Gossiper) handleSearchRequest(packet *GossiperPacketSender) erro
 	return nil
 }
 
-func (gossiper *Gossiper) buildSearchResults(keywords []string) []*common.SearchResult {
+func (gossiper *Gossiper) buildSearchResults(keywords []string) []*SearchResult {
 	gossiper.filesMutex.Lock()
 	defer gossiper.filesMutex.Unlock()
 
-	var results []*common.SearchResult
+	var results []*SearchResult
 	for name, file := range gossiper.files {
 		for _, keyword := range keywords {
 			if strings.Contains(name, keyword) {
-				result := &common.SearchResult{
+				result := &SearchResult{
 					FileName:     name,
 					MetafileHash: file.MetaHash,
 				}
@@ -87,7 +85,7 @@ func (gossiper *Gossiper) buildSearchResults(keywords []string) []*common.Search
 	return results
 }
 
-func (gossiper *Gossiper) isDuplicate(request *common.SearchRequest) bool {
+func (gossiper *Gossiper) isDuplicate(request *SearchRequest) bool {
 	gossiper.recentRequestsMutex.Lock()
 	defer gossiper.recentRequestsMutex.Unlock()
 	now := time.Now()
@@ -96,7 +94,7 @@ func (gossiper *Gossiper) isDuplicate(request *common.SearchRequest) bool {
 	for i := len(gossiper.recentReceivedRequests) - 1; i >= 0; i-- {
 		recent := gossiper.recentReceivedRequests[i]
 
-		if now.Sub(recent.Timestamp) < common.RecentRequestAgeMs*time.Millisecond {
+		if now.Sub(recent.Timestamp) < RecentRequestAgeMs*time.Millisecond {
 			if recent.Request.Origin == request.Origin {
 				for j, k := range recent.Request.Keywords {
 					if k != request.Keywords[j] {
@@ -119,7 +117,7 @@ func (gossiper *Gossiper) isDuplicate(request *common.SearchRequest) bool {
 	return false
 }
 
-func (gossiper *Gossiper) archiveRecentRequest(request *common.SearchRequest) {
+func (gossiper *Gossiper) archiveRecentRequest(request *SearchRequest) {
 	gossiper.recentRequestsMutex.Lock()
 	defer gossiper.recentRequestsMutex.Unlock()
 	newRecent := &ReceivedSearchRequest{

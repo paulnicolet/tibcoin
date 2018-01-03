@@ -1,8 +1,6 @@
 package gossipernode
 
-import (
-	"github.com/paulnicolet/tibcoin/common"
-)
+import ()
 
 // -------------------------------- Routines -------------------------------- //
 
@@ -22,7 +20,7 @@ func (gossiper *Gossiper) handlePrivateMessage(packet *GossiperPacketSender) err
 	privateMessage := packet.packet.Private
 
 	// Pack in private packet for simulate inheritance
-	privatePacket := &common.PrivatePacket{
+	privatePacket := &PrivatePacket{
 		Origin:         privateMessage.Origin,
 		Destination:    privateMessage.Destination,
 		HopLimit:       privateMessage.HopLimit,

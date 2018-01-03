@@ -5,11 +5,9 @@ import (
 	"fmt"
 	"net"
 	"strings"
-
-	"github.com/paulnicolet/tibcoin/common"
 )
 
-func (gossiper *Gossiper) logSearchReply(reply *common.SearchReply, budget uint64) {
+func (gossiper *Gossiper) logSearchReply(reply *SearchReply, budget uint64) {
 	for _, result := range reply.Results {
 		log := fmt.Sprintf("FOUND match %s at %s budget=%d metafile=%s chunks=", result.FileName, reply.Origin, budget, hex.EncodeToString(result.MetafileHash))
 		var chunks []string
@@ -23,7 +21,7 @@ func (gossiper *Gossiper) logSearchReply(reply *common.SearchReply, budget uint6
 	}
 }
 
-func (gossiper *Gossiper) logStatus(status *common.StatusPacket, relay *net.UDPAddr) {
+func (gossiper *Gossiper) logStatus(status *StatusPacket, relay *net.UDPAddr) {
 	result := fmt.Sprintf("STATUS from %s", relay.String())
 	for _, peerStatus := range status.Want {
 		result += fmt.Sprintf(" origin %s nextID %d", peerStatus.Identifier, peerStatus.NextID)
@@ -68,7 +66,7 @@ func (gossiper *Gossiper) logSynced(peer *Peer) {
 	gossiper.stdLogger.Printf("IN SYNC WITH %s", peer.addr)
 }
 
-func (gossiper *Gossiper) logRumor(rumor *common.RumorMessage, relay *net.UDPAddr) {
+func (gossiper *Gossiper) logRumor(rumor *RumorMessage, relay *net.UDPAddr) {
 	if gossiper.isRoutingRumor(rumor) {
 		gossiper.stdLogger.Printf("ROUTING RUMOR origin %s from %s ID %d", rumor.Origin, relay.String(), rumor.ID)
 	} else {
@@ -76,7 +74,7 @@ func (gossiper *Gossiper) logRumor(rumor *common.RumorMessage, relay *net.UDPAdd
 	}
 }
 
-func (gossiper *Gossiper) logRumorMongering(rumor *common.RumorMessage, peer *Peer) {
+func (gossiper *Gossiper) logRumorMongering(rumor *RumorMessage, peer *Peer) {
 	if gossiper.isRoutingRumor(rumor) {
 		gossiper.logRouteMongering(peer)
 	} else {
@@ -92,6 +90,6 @@ func (gossiper *Gossiper) logRouteMongering(peer *Peer) {
 	gossiper.stdLogger.Printf("MONGERING ROUTE with %s", peer.addr.String())
 }
 
-func (gossiper *Gossiper) logPrivateMessage(privateMessage *common.PrivateMessage) {
+func (gossiper *Gossiper) logPrivateMessage(privateMessage *PrivateMessage) {
 	gossiper.stdLogger.Printf("PRIVATE: %s:%d:%s", privateMessage.Origin, privateMessage.HopLimit, privateMessage.Text)
 }

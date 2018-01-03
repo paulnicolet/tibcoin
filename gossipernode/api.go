@@ -3,17 +3,15 @@ package gossipernode
 import (
 	"net"
 	"time"
-
-	"github.com/paulnicolet/tibcoin/common"
 )
 
 func (gossiper *Gossiper) sendNewPrivateMessage(message string, dest string) {
 	gossiper.stdLogger.Printf("CLIENT PRIVATE %s %s\n", message, dest)
 
-	private := &common.PrivateMessage{
+	private := &PrivateMessage{
 		Origin:      gossiper.name,
 		Destination: dest,
-		HopLimit:    common.HopLimit,
+		HopLimit:    HopLimit,
 		ID:          0,
 		Text:        message,
 	}
@@ -30,7 +28,7 @@ func (gossiper *Gossiper) sendNewPrivateMessage(message string, dest string) {
 }
 
 func (gossiper *Gossiper) sendNewMessage(message string) {
-	rumor := &common.RumorMessage{Origin: gossiper.name, ID: gossiper.getID(), Text: message}
+	rumor := &RumorMessage{Origin: gossiper.name, ID: gossiper.getID(), Text: message}
 
 	gossiper.stdLogger.Printf("CLIENT %s %s\n", rumor.Text, gossiper.name)
 	gossiper.logPeers()
@@ -99,7 +97,7 @@ func (gossiper *Gossiper) searchFile(keywords []string, budget uint64) {
 	gossiper.matchesMutex.Unlock()
 
 	// Create the new request to propagate
-	request := &common.SearchRequest{
+	request := &SearchRequest{
 		Origin:   gossiper.name,
 		Budget:   budget,
 		Keywords: keywords,
@@ -114,7 +112,7 @@ func (gossiper *Gossiper) searchFile(keywords []string, budget uint64) {
 	gossiper.recentReceivedRequests = append(gossiper.recentReceivedRequests, receivedRequest)
 	gossiper.recentRequestsMutex.Unlock()
 
-	ticker := time.NewTicker(common.FileSearchRepeatDelay * time.Second)
+	ticker := time.NewTicker(FileSearchRepeatDelay * time.Second)
 	tickerKiller := make(chan bool)
 	timeout := &Timeout{
 		Ticker: ticker,
