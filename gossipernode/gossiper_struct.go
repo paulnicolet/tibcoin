@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/paulnicolet/tibcoin/blockchain.go"
+	"github.com/paulnicolet/tibcoin/blockchain"
 	"github.com/paulnicolet/tibcoin/common"
 )
 
@@ -83,11 +83,16 @@ type Gossiper struct {
 	recentReceivedRequests []*ReceivedSearchRequest
 	privateKey             *ecdsa.PrivateKey
 
-	topBlock        []byte
-	blocks          map[[]byte]*Block
-	forks           [][]byte
-	blockOrphanPool [][]byte
-	txPool          []Transaction
+	topBlock             []byte
+	topBlockMutex        *sync.Mutex
+	blocks               map[[]byte]*Block
+	blocksMutex          *sync.Mutex
+	forks                [][]byte
+	forksMutex           *sync.Mutex
+	blockOrphanPool      [][]byte
+	blockOrphanPoolMutex *sync.Mutex
+	txPool               []*Transaction
+	txPoolMutex          *sync.Mutex
 }
 
 func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDPAddr, peersAddr []*net.UDPAddr, rtimer *time.Duration, noforward bool) (*Gossiper, error) {
@@ -146,6 +151,16 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 		recentReceivedRequests: make([]*ReceivedSearchRequest, 0, 0),
 		matchesMutex:           &sync.Mutex{},
 		privateKey:             key,
+		topBlock:               blockChain.HashGenesis, // TODO compute it before
+		topBlockMutex:          &sync.Mutex{},
+		blocks:                 make(map[[]byte]*Block), // TODO init with Genesis inside
+		blocksMutex:            &sync.Mutex{},
+		forks:                  make([][]byte, 0),
+		forksMutex:             &sync.Mutex{},
+		blockOrphanPool:        make([][]byte, 0),
+		blockOrphanPoolMutex:   &sync.Mutex{},
+		txPool:                 make([]*Transaction, 0),
+		txPoolMutex:            &sync.Mutex{},
 	}, nil
 }
 
@@ -159,6 +174,8 @@ func (gossiper *Gossiper) Start() error {
 	dataReplyChannel := make(chan *GossiperPacketSender)
 	searchRequestChannel := make(chan *GossiperPacketSender)
 	searchReplyChannel := make(chan *GossiperPacketSender)
+	blockRequestChannel := make(chan *GossiperPacketSender)
+	blockReplyChannel := make(chan *GossiperPacketSender)
 
 	// Launch webserver
 	go gossiper.LaunchWebServer()
@@ -168,7 +185,7 @@ func (gossiper *Gossiper) Start() error {
 	go gossiper.Listen(gossiper.gossipConn, gossipChannel)
 
 	// Spawn handler
-	go gossiper.GossiperRoutine(gossipChannel, rumorChannel, statusChannel, privateChannel, dataRequestChannel, dataReplyChannel, searchRequestChannel, searchReplyChannel)
+	go gossiper.GossiperRoutine(gossipChannel, rumorChannel, statusChannel, privateChannel, dataRequestChannel, dataReplyChannel, searchRequestChannel, searchReplyChannel, blockRequestChannel, blockReplyChannel)
 	go gossiper.CLIRoutine(clientChannel)
 	go gossiper.RumorRoutine(rumorChannel)
 	go gossiper.StatusRoutine(statusChannel)
