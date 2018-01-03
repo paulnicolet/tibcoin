@@ -13,11 +13,11 @@ type Block struct {
 	Timestamp int64
 	Height    int
 	Nonce     int
-	PrevHash  []byte
+	PrevHash  [32]byte
 	Txs       []*Transaction
 }
 
-func (block *Block) hash() []byte {
+func (block *Block) hash() [32]byte {
 	hash := sha256.New()
 	hash.Write([]byte(fmt.Sprintf("%v", block.Timestamp)))
 	hash.Write([]byte(strconv.Itoa(block.Height)))
@@ -28,7 +28,7 @@ func (block *Block) hash() []byte {
 		hash.Write(tx.hash())
 	}
 
-	return hash.Sum(nil)
+	return BytesToHash(hash.Sum(nil))
 }
 
 const CoinBase = 50

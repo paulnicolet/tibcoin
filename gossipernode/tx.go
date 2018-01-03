@@ -1,8 +1,11 @@
 package gossipernode
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"errors"
+	"math"
 )
 
 /*
@@ -23,6 +26,8 @@ In our case only P2PKH is used, and we remove scripting:
 		UTXO, it can then spend the UTXOs
 */
 
+const FeeRatio = float64(0.02)
+
 type Transaction struct {
 	inputs  []*TxInput
 	outputs []*TxOutput
@@ -34,7 +39,7 @@ type Transaction struct {
 
 type TxInput struct {
 	outputTxHash []byte
-	outputIdx    uint
+	outputIdx    int
 }
 
 type TxOutput struct {
@@ -42,17 +47,65 @@ type TxOutput struct {
 	to    string
 }
 
-func (gossiper *Gossiper) NewTransaction(to string, value uint) (*Transaction, error) {
-	// Scan blockchain to gather enough UTXO to pay for "value" coins
-	// Gather UTXOs in inputs
+type TxOutputLocation struct {
+	output       *TxOutput
+	outputTxHash []byte
+	outputIdx    int
+}
 
-	// Create output for "to"
-	// Create output for itself if change needed
-	// Add transaction fees
+func (gossiper *Gossiper) NewTransaction(to string, value int) (*Transaction, error) {
+	// Create new transaction
+	tx := &Transaction{
+		publicKey: gossiper.privateKey.PublicKey,
+	}
+
+	// Get outputs
+	outputs := gossiper.CollectOutputs()
+	unspent := gossiper.FilterSpentOutputs(outputs)
+
+	// Add inputs
+	sum := 0
+	fees := int(math.Ceil(FeeRatio * float64(value)))
+	for _, output := range unspent {
+		input := &TxInput{
+			outputTxHash: output.outputTxHash,
+			outputIdx:    output.outputIdx,
+		}
+
+		tx.inputs = append(tx.inputs, input)
+
+		sum += output.output.value
+		if sum >= value+fees {
+			break
+		}
+	}
+
+	if sum < value+fees {
+		return nil, errors.New("Not enough UTXO to create new transaction")
+	}
+
+	// Add main output
+	mainOutput := &TxOutput{
+		to:    to,
+		value: value,
+	}
+	tx.outputs = append(tx.outputs, mainOutput)
+
+	// Add change
+	change := sum - (value + fees)
+	changeOutput := &TxOutput{
+		to:    PublicKeyToAddress(gossiper.privateKey.PublicKey),
+		value: change,
+	}
+	tx.outputs = append(tx.outputs, changeOutput)
 
 	// Sign transaction
+	tx, err := gossiper.signTx(tx)
+	if err != nil {
+		return nil, err
+	}
 
-	return nil, nil
+	return tx, nil
 }
 
 func (gossiper *Gossiper) VerifyTransaction(tx *Transaction) bool {
@@ -126,4 +179,89 @@ func (gossiper *Gossiper) checkSig(tx *Transaction) bool {
 	}
 
 	return true
+}
+
+func (gossiper *Gossiper) FilterSpentOutputs(outputs []*TxOutputLocation) []*TxOutputLocation {
+	var toRemove []int
+
+	// Get first hash
+	gossiper.topBlockMutex.Lock()
+	currentBlockHash := gossiper.topBlock
+	gossiper.topBlockMutex.Unlock()
+	genesisHash := GenesisBlockHash()
+
+	// Look for spent outputs
+	for {
+		// Get block
+		gossiper.blocksMutex.Lock()
+		currentBlock := gossiper.blocks[currentBlockHash]
+		gossiper.blocksMutex.Unlock()
+
+		for _, tx := range currentBlock.Txs {
+			for _, input := range tx.inputs {
+				for idx, outputLocation := range outputs {
+					if bytes.Equal(outputLocation.outputTxHash, input.outputTxHash) && outputLocation.outputIdx == input.outputIdx {
+						toRemove = append(toRemove, idx)
+					}
+				}
+			}
+		}
+
+		// Break if root of the chain
+		if bytes.Equal(currentBlockHash[:], genesisHash[:]) {
+			break
+		}
+		currentBlockHash = currentBlock.PrevHash
+	}
+
+	// Filter spent outputs
+	var unspent []*TxOutputLocation
+	for i, output := range outputs {
+		for _, j := range toRemove {
+			if i != j {
+				unspent = append(unspent, output)
+			}
+		}
+	}
+
+	return unspent
+}
+
+func (gossiper *Gossiper) CollectOutputs() []*TxOutputLocation {
+	address := PublicKeyToAddress(gossiper.privateKey.PublicKey)
+	var outputs []*TxOutputLocation
+
+	// Get first hash
+	gossiper.topBlockMutex.Lock()
+	currentBlockHash := gossiper.topBlock
+	gossiper.topBlockMutex.Unlock()
+	genesisHash := GenesisBlockHash()
+
+	for {
+		// Get block
+		gossiper.blocksMutex.Lock()
+		currentBlock := gossiper.blocks[currentBlockHash]
+		gossiper.blocksMutex.Unlock()
+
+		for _, tx := range currentBlock.Txs {
+			for idx, output := range tx.outputs {
+				if output.to == address {
+					location := &TxOutputLocation{
+						output:       output,
+						outputTxHash: tx.hash(),
+						outputIdx:    idx,
+					}
+					outputs = append(outputs, location)
+				}
+			}
+		}
+
+		// Break if root of the chain
+		if bytes.Equal(currentBlockHash[:], genesisHash[:]) {
+			break
+		}
+		currentBlockHash = currentBlock.PrevHash
+	}
+
+	return outputs
 }

@@ -41,3 +41,9 @@ type Sig struct {
 func (sig Sig) Equal(other Sig) bool {
 	return sig.R.Cmp(other.R) == 0 && sig.S.Cmp(other.S) == 0
 }
+
+func BytesToHash(bytes []byte) [32]byte {
+	var hash [32]byte
+	copy(hash[:], bytes)
+	return hash
+}
