@@ -8,6 +8,23 @@ import (
 	"github.com/paulnicolet/tibcoin/common"
 )
 
+func (tx *Transaction) hash() [32]byte {
+	h := sha256.New()
+
+	// Hash inputs
+	for _, input := range tx.inputs {
+		h.Write(input.hash())
+	}
+
+	// Hash outputs
+	for _, output := range tx.outputs {
+		h.Write(output.hash())
+	}
+
+	// Hash signature
+	h.Write()
+}
+
 func (tx *Transaction) getSignable() []byte {
 	h := sha256.New()
 
@@ -16,7 +33,7 @@ func (tx *Transaction) getSignable() []byte {
 		h.Write(input.hash())
 	}
 
-	// Hash ouputs
+	// Hash outputs
 	for _, output := range tx.outputs {
 		h.Write(output.hash())
 	}
@@ -60,7 +77,26 @@ func (in *TxInput) equals(other *TxInput) bool {
 	return bytes.Equal(in.outputTxHash, other.outputTxHash) && in.outputIdx == other.outputIdx
 }
 
+// We are looking only in the main branch for a correpsonding transaction
 func (gossiper *Gossiper) getOutput(in *TxInput) (*TxOutput, error) {
+	currentBlock := gossiper.topBlock
+	blockExists := true
+	for blockExists {
+		// Check if block contains transaction we are looking for
+		for _, tx := currentBlock.Txs {
+			if tx.hash()
+		}
+
+		tx, foundTx := currentBlock.Txs[in.outputTxHash]
+		if foundTx {
+
+			return (tx, nil)
+		}
+
+		// Get the previous block
+		currentBlock, blockExists = gossiper.blocks[currentBlock.PrevHash]
+	}
+
 	return nil, nil
 }
 
