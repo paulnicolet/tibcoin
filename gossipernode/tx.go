@@ -1,11 +1,8 @@
 package gossipernode
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"crypto/rand"
-
-	"github.com/paulnicolet/tibcoin/common"
 )
 
 /*
@@ -30,22 +27,22 @@ type Transaction struct {
 	inputs  []*TxInput
 	outputs []*TxOutput
 	// Transaction signature
-	sig common.Sig
+	sig Sig
 	// Public key needed to check signature against UTXOs
 	publicKey ecdsa.PublicKey
 }
 
 type TxInput struct {
-	outputTxHash []byte
+	outputTxHash [32]byte
 	outputIdx    uint
 }
 
 type TxOutput struct {
-	value uint
-	to    common.Address
+	value int
+	to    string
 }
 
-func (gossiper *Gossiper) NewTransaction(to common.Address, value uint) (*Transaction, error) {
+func (gossiper *Gossiper) NewTransaction(to string, value uint) (*Transaction, error) {
 	// Scan blockchain to gather enough UTXO to pay for "value" coins
 	// Gather UTXOs in inputs
 
@@ -65,7 +62,7 @@ func (gossiper *Gossiper) VerifyTransaction(tx *Transaction) bool {
 	// Each output must be in legal money range
 	// Reject if tx already present in the pool
 	// Check that UTXO of each input are not already used by tx in the pool
-	// Look for UTXOs in the chain
+	// Look for UTXOs in the main chain, or if in fork or orphan block, put in orphan txs
 	// Check that input values are in legal money range
 	// Check that sum of input > sum of outputs
 	// Check that tx fee is enough to get into an empty block
@@ -77,10 +74,10 @@ func (gossiper *Gossiper) VerifyTransaction(tx *Transaction) bool {
 func (gossiper *Gossiper) computeTxFee(tx *Transaction) (int, error) {
 	// Look for input values
 	inputsCash := 0
-	for _, input := tx.inputs {
+	for _, input := range tx.inputs {
 		corrTxOutput, outputErr := gossiper.getOutput(input)
 		if outputErr != nil {
-			return (0, outputErr)
+			return 0, outputErr
 		}
 
 		inputsCash += corrTxOutput.value
@@ -88,42 +85,43 @@ func (gossiper *Gossiper) computeTxFee(tx *Transaction) (int, error) {
 
 	// Look for output values
 	outputsCash := 0
-	for _, output := tx.outputs {
+	for _, output := range tx.outputs {
 		inputsCash += output.value
 	}
 
 	// Fee is the difference
-	return inputsCash - outputsCash
+	return inputsCash - outputsCash, nil
 }
 
 func (gossiper *Gossiper) signTx(tx *Transaction) (*Transaction, error) {
-	r, s, err := ecdsa.Sign(rand.Reader, gossiper.privateKey, tx.getSignable())
+	signable := tx.getSignable()
+	r, s, err := ecdsa.Sign(rand.Reader, gossiper.privateKey, signable[:])
 	if err != nil {
 		return nil, err
 	}
 
-	tx.sig = common.Sig{R: r, S: s}
+	tx.sig = Sig{R: r, S: s}
 	return tx, nil
 }
 
 func (gossiper *Gossiper) checkSig(tx *Transaction) bool {
 	// Check tx signature against each UTXO
-	address := common.PublicKeyToAddress(tx.publicKey)
+	address := PublicKeyToAddress(tx.publicKey)
 	signable := tx.getSignable()
 
 	for _, input := range tx.inputs {
-		output, err := input.getOutput()
+		output, err := gossiper.getOutput(input)
 		if err != nil {
 			return false
 		}
 
 		// Check receiver address
-		if !bytes.Equal(output.to.PubKeyHash[:], address.PubKeyHash[:]) {
+		if !(output.to == address) {
 			return false
 		}
 
 		// Check signature
-		if !ecdsa.Verify(&tx.publicKey, signable, tx.sig.R, tx.sig.S) {
+		if !ecdsa.Verify(&tx.publicKey, signable[:], tx.sig.R, tx.sig.S) {
 			return false
 		}
 	}
