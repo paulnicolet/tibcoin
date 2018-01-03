@@ -6,6 +6,11 @@ import (
 	"strconv"
 )
 
+func (tx *Transaction) hash() []byte {
+	hash := sha256.New()
+	return hash.Sum(nil)
+}
+
 func (tx *Transaction) getSignable() []byte {
 	h := sha256.New()
 

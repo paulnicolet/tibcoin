@@ -7,7 +7,7 @@ import (
 
 func (gossiper *Gossiper) Mine(target []byte, previousBlock *Block, txs []*Transaction) {
 	// Hash the previous block
-	prevHash := previousBlock.Hash()
+	prevHash := previousBlock.hash()
 
 	// Compute the fees
 	fees := gossiper.computeFees(txs)
@@ -16,24 +16,24 @@ func (gossiper *Gossiper) Mine(target []byte, previousBlock *Block, txs []*Trans
 	// Init block
 	nonce := 0
 	block := Block{
-		TimeStamp: time.Now().Unix(),
+		Timestamp: time.Now().Unix(),
 		Height:    previousBlock.Height + 1,
 		Nonce:     nonce,
 		PrevHash:  prevHash,
 		Txs:       txs,
 	}
 
-	blockHash := block.Hash()
+	blockHash := block.hash()
 	for bytes.Compare(blockHash[:], target) >= 0 {
 		nonce++
 		block := Block{
-			TimeStamp: time.Now().Unix(),
+			Timestamp: time.Now().Unix(),
 			Height:    previousBlock.Height + 1,
 			Nonce:     nonce,
 			PrevHash:  prevHash,
 			Txs:       txs,
 		}
-		blockHash = block.Hash()
+		blockHash = block.hash()
 	}
 }
 
