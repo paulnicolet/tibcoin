@@ -163,6 +163,19 @@ func (gossiper *Gossiper) alreadySpent(outputs []*TxOutputLocation) bool {
 		gossiper.blocksMutex.Unlock()
 	}
 
+	// Look in the pool
+	gossiper.txPoolMutex.Lock()
+	for _, tx := range gossiper.txPool {
+		for _, input := range tx.inputs {
+			for _, outputLocation := range outputs {
+				if bytes.Equal(outputLocation.outputTxHash[:], input.outputTxHash[:]) && outputLocation.outputIdx == input.outputIdx {
+					return true
+				}
+			}
+		}
+	}
+	gossiper.txPoolMutex.Unlock()
+
 	return false
 }
 
