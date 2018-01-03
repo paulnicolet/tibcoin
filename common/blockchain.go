@@ -24,7 +24,7 @@ type Block struct {
 
 const CoinBase = 50
 const GenesisBlock = Block{
-	TimeStamp: new time.Date(2018, 1, 3, 11, 00, 00, 00, time.UTC),
+	TimeStamp: new time.Date(2018, 1, 3, 11, 00, 00, 00, time.UTC).Unix(),
 	Height: 0,
 	Nonce: 0,
 	PrevHash: make([]byte, 0),

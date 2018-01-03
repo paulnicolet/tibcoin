@@ -27,8 +27,8 @@ In our case only P2PKH is used, and we remove scripting:
 */
 
 type Transaction struct {
-	inputs  []TxInput
-	outputs []TxOutput
+	inputs  []*TxInput
+	outputs []*TxOutput
 	// Transaction signature
 	sig common.Sig
 	// Public key needed to check signature against UTXOs
@@ -71,6 +71,29 @@ func (gossiper *Gossiper) VerifyTransaction(tx *Transaction) bool {
 	// Check that tx fee is enough to get into an empty block
 	// Check sig against each output
 	return false
+}
+
+// Return an error if an input didn't correspond to any known output in the main branch
+func (gossiper *Gossiper) computeTxFee(tx *Transaction) (int, error) {
+	// Look for input values
+	inputsCash := 0
+	for _, input := tx.inputs {
+		corrTxOutput, outputErr := gossiper.getOutput(input)
+		if outputErr != nil {
+			return (0, outputErr)
+		}
+
+		inputsCash += corrTxOutput.value
+	}
+
+	// Look for output values
+	outputsCash := 0
+	for _, output := tx.outputs {
+		inputsCash += output.value
+	}
+
+	// Fee is the difference
+	return inputsCash - outputsCash
 }
 
 func (gossiper *Gossiper) signTx(tx *Transaction) (*Transaction, error) {
