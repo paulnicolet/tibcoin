@@ -4,13 +4,14 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"github.com/dedis/protobuf"
-	"github.com/paulnicolet/Peerster/part2/common"
 	"log"
 	"net"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/dedis/protobuf"
+	"github.com/paulnicolet/tibcoin/common"
 )
 
 const DEFAULT_UI_PORT = "10001"
