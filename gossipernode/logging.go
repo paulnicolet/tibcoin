@@ -17,7 +17,7 @@ func (gossiper *Gossiper) logSearchReply(reply *SearchReply, budget uint64) {
 
 		log += strings.Join(chunks, ",")
 
-		gossiper.stdLogger.Println(log)
+		// gossiper.stdLogger.Println(log)
 	}
 }
 
@@ -27,7 +27,7 @@ func (gossiper *Gossiper) logStatus(status *StatusPacket, relay *net.UDPAddr) {
 		result += fmt.Sprintf(" origin %s nextID %d", peerStatus.Identifier, peerStatus.NextID)
 	}
 	result += "\n"
-	gossiper.stdLogger.Printf(result)
+	// gossiper.stdLogger.Printf(result)
 }
 
 func (gossiper *Gossiper) logPeers() {
@@ -47,30 +47,30 @@ func (gossiper *Gossiper) logPeers() {
 		i++
 	}
 
-	gossiper.stdLogger.Printf(result)
+	// gossiper.stdLogger.Printf(result)
 }
 
 func (gossiper *Gossiper) logDSDV(dest string, hop *net.UDPAddr) {
-	gossiper.stdLogger.Printf("DSDV %s:%s", dest, hop)
+	// gossiper.stdLogger.Printf("DSDV %s:%s", dest, hop)
 }
 
 func (gossiper *Gossiper) logDirectRoute(dest string, hop *net.UDPAddr) {
-	gossiper.stdLogger.Printf("DIRECT-ROUTE FOR %s: %v", dest, hop)
+	// gossiper.stdLogger.Printf("DIRECT-ROUTE FOR %s: %v", dest, hop)
 }
 
 func (gossiper *Gossiper) logCoinFlip(peer *Peer) {
-	gossiper.stdLogger.Printf("FLIPPED COIN sending rumor to %s", peer.addr.String())
+	// gossiper.stdLogger.Printf("FLIPPED COIN sending rumor to %s", peer.addr.String())
 }
 
 func (gossiper *Gossiper) logSynced(peer *Peer) {
-	gossiper.stdLogger.Printf("IN SYNC WITH %s", peer.addr)
+	// gossiper.stdLogger.Printf("IN SYNC WITH %s", peer.addr)
 }
 
 func (gossiper *Gossiper) logRumor(rumor *RumorMessage, relay *net.UDPAddr) {
 	if gossiper.isRoutingRumor(rumor) {
-		gossiper.stdLogger.Printf("ROUTING RUMOR origin %s from %s ID %d", rumor.Origin, relay.String(), rumor.ID)
+		// gossiper.stdLogger.Printf("ROUTING RUMOR origin %s from %s ID %d", rumor.Origin, relay.String(), rumor.ID)
 	} else {
-		gossiper.stdLogger.Printf("RUMOR origin %s from %s ID %d contents %s\n", rumor.Origin, relay.String(), rumor.ID, rumor.Text)
+		// gossiper.stdLogger.Printf("RUMOR origin %s from %s ID %d contents %s\n", rumor.Origin, relay.String(), rumor.ID, rumor.Text)
 	}
 }
 
@@ -83,13 +83,13 @@ func (gossiper *Gossiper) logRumorMongering(rumor *RumorMessage, peer *Peer) {
 }
 
 func (gossiper *Gossiper) logTextMongering(peer *Peer) {
-	gossiper.stdLogger.Printf("MONGERING TEXT with %s", peer.addr.String())
+	// gossiper.stdLogger.Printf("MONGERING TEXT with %s", peer.addr.String())
 }
 
 func (gossiper *Gossiper) logRouteMongering(peer *Peer) {
-	gossiper.stdLogger.Printf("MONGERING ROUTE with %s", peer.addr.String())
+	// gossiper.stdLogger.Printf("MONGERING ROUTE with %s", peer.addr.String())
 }
 
 func (gossiper *Gossiper) logPrivateMessage(privateMessage *PrivateMessage) {
-	gossiper.stdLogger.Printf("PRIVATE: %s:%d:%s", privateMessage.Origin, privateMessage.HopLimit, privateMessage.Text)
+	// gossiper.stdLogger.Printf("PRIVATE: %s:%d:%s", privateMessage.Origin, privateMessage.HopLimit, privateMessage.Text)
 }

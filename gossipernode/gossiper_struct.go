@@ -79,6 +79,7 @@ type Gossiper struct {
 	recentRequestsMutex    *sync.Mutex
 	recentReceivedRequests []*ReceivedSearchRequest
 	privateKey             *ecdsa.PrivateKey
+	publicKey              *PublicKey
 	topBlock               [32]byte
 	topBlockMutex          *sync.Mutex
 	blocks                 map[[32]byte]*Block
@@ -124,9 +125,13 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 	}
 
 	// Generate public/private key pair
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, err
+	}
+	publicKey := &PublicKey{
+		X: privateKey.PublicKey.X,
+		Y: privateKey.PublicKey.Y,
 	}
 
 	// Init first block
@@ -161,7 +166,8 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 		recentRequestsMutex:    &sync.Mutex{},
 		recentReceivedRequests: make([]*ReceivedSearchRequest, 0, 0),
 		matchesMutex:           &sync.Mutex{},
-		privateKey:             key,
+		privateKey:             privateKey,
+		publicKey:              publicKey,
 		topBlock:               genesisHash,
 		topBlockMutex:          &sync.Mutex{},
 		blocks:                 blocks,
@@ -222,7 +228,7 @@ func (gossiper *Gossiper) Start() error {
 	// Miner
 	go gossiper.Mine(startMiningChannel)
 
-	add := PublicKeyToAddress(gossiper.privateKey.PublicKey)
+	add := PublicKeyToAddress(gossiper.publicKey)
 	gossiper.errLogger.Printf("Tibcoin address %s\n", add)
 
 	// TODO: remove
