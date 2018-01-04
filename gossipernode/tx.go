@@ -79,6 +79,8 @@ func (gossiper *Gossiper) NewTransaction(to string, value int) (*Transaction, er
 		}
 	}
 
+	gossiper.errLogger.Printf("Sum %d, value %d, fees %d", sum, value, fees)
+
 	if sum < value+fees {
 		return nil, errors.New("Not enough UTXO to create new transaction")
 	}
@@ -110,6 +112,8 @@ func (gossiper *Gossiper) NewTransaction(to string, value int) (*Transaction, er
 // From Mastering Bitcoin book
 // Returns (validated, orphan)
 func (gossiper *Gossiper) VerifyTransaction(tx *Transaction) (bool, bool) {
+	gossiper.errLogger.Println("Verifying tx...")
+
 	// Check neither in or out lists are empty
 	if len(tx.inputs) == 0 || len(tx.outputs) == 0 {
 		return false, false
@@ -301,10 +305,16 @@ func (gossiper *Gossiper) FilterSpentOutputs(outputs []*TxOutputLocation) []*TxO
 	// Filter spent outputs
 	var unspent []*TxOutputLocation
 	for i, output := range outputs {
+		include := true
 		for _, j := range toRemove {
-			if i != j {
-				unspent = append(unspent, output)
+			if i == j {
+				include = false
+				break
 			}
+		}
+
+		if include {
+			unspent = append(unspent, output)
 		}
 	}
 
@@ -312,6 +322,7 @@ func (gossiper *Gossiper) FilterSpentOutputs(outputs []*TxOutputLocation) []*TxO
 }
 
 func (gossiper *Gossiper) CollectOutputs() []*TxOutputLocation {
+	gossiper.errLogger.Println("Collecting UTXOs...")
 	address := PublicKeyToAddress(gossiper.privateKey.PublicKey)
 	var outputs []*TxOutputLocation
 
@@ -326,6 +337,7 @@ func (gossiper *Gossiper) CollectOutputs() []*TxOutputLocation {
 	gossiper.blocksMutex.Unlock()
 
 	for blockExists {
+		gossiper.errLogger.Printf("Txs in current block %d", len(currentBlock.Txs))
 		for _, tx := range currentBlock.Txs {
 			for idx, output := range tx.outputs {
 				if output.to == address {
