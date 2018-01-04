@@ -32,14 +32,14 @@ func (gossiper *Gossiper) Mine(channel <-chan bool) (*Block, error) {
 	// Compute the fees
 	fees, feesErr := gossiper.computeFees(txs)
 	if feesErr != nil {
-		gossiper.errLogger.Printf("Error when computing fees of txs (prevHash = %x, height = %d); sleeping for 60 sec.\n", prevHash[:], previousBlock.Height + 1)
+		gossiper.errLogger.Printf("Error when computing fees of txs (prevHash = %x, height = %d); sleeping for 60 sec.\n", prevHash[:], previousBlock.Height+1)
 		time.Sleep(60 * time.Second)
 	}
 
 	// Create Coinbase transaction
 	coinbaseTx, coinbaseErr := gossiper.createCoinbaseTx(fees)
 	if coinbaseErr != nil {
-		gossiper.errLogger.Printf("Error when signing coinbase tx (prevHash = %x, height = %d); sleeping for 60 sec.\n", prevHash[:], previousBlock.Height + 1)
+		gossiper.errLogger.Printf("Error when signing coinbase tx (prevHash = %x, height = %d); sleeping for 60 sec.\n", prevHash[:], previousBlock.Height+1)
 		time.Sleep(60 * time.Second)
 	}
 
@@ -48,7 +48,7 @@ func (gossiper *Gossiper) Mine(channel <-chan bool) (*Block, error) {
 	newTxs[0] = coinbaseTx
 	newTxs = append(newTxs, txs...)
 
-	// Mine until we find a block or we're told to start mining again 
+	// Mine until we find a block or we're told to start mining again
 	nonce := 0
 	resetBlock := false
 	for {
@@ -78,14 +78,14 @@ func (gossiper *Gossiper) Mine(channel <-chan bool) (*Block, error) {
 			// Compute the fees
 			fees, feesErr = gossiper.computeFees(txs)
 			if feesErr != nil {
-				gossiper.errLogger.Printf("Error when computing fees of txs (prevHash = %x, height = %d); sleeping for 60 sec.\n", prevHash[:], previousBlock.Height + 1)
+				gossiper.errLogger.Printf("Error when computing fees of txs (prevHash = %x, height = %d); sleeping for 60 sec.\n", prevHash[:], previousBlock.Height+1)
 				time.Sleep(60 * time.Second)
 			}
 
 			// Create Coinbase transaction
 			coinbaseTx, coinbaseErr = gossiper.createCoinbaseTx(fees)
 			if coinbaseErr != nil {
-				gossiper.errLogger.Printf("Error when signing coinbase tx (prevHash = %x, height = %d); sleeping for 60 sec.\n", prevHash[:], previousBlock.Height + 1)
+				gossiper.errLogger.Printf("Error when signing coinbase tx (prevHash = %x, height = %d); sleeping for 60 sec.\n", prevHash[:], previousBlock.Height+1)
 				time.Sleep(60 * time.Second)
 			}
 
@@ -109,7 +109,7 @@ func (gossiper *Gossiper) Mine(channel <-chan bool) (*Block, error) {
 		// See if found new valid block
 		if bytes.Compare(blockHash[:], target[:]) < 0 {
 			// Found block!
-			fmt.Printf("Found new block: %x (height = %d).\n", blockHash[:], previousBlock.Height + 1)
+			fmt.Printf("Found new block: %x (height = %d).\n", blockHash[:], previousBlock.Height+1)
 			gossiper.blocksMutex.Lock()
 			gossiper.blocks[blockHash] = block
 			gossiper.blocksMutex.Unlock()
@@ -152,15 +152,15 @@ func (gossiper *Gossiper) createCoinbaseTx(fees int) (*Transaction, error) {
 	// 1 single output being ourselves
 	outputs := make([]*TxOutput, 1)
 	outputs[0] = &TxOutput{
-		value: fees + BaseReward,
-		to: PublicKeyToAddress(gossiper.privateKey.PublicKey),
+		Value: fees + BaseReward,
+		To:    PublicKeyToAddress(gossiper.publicKey),
 	}
 
 	// Create tx (unsigned)
 	tx := &Transaction{
-		inputs: inputs,
-		outputs: outputs,
-		publicKey: gossiper.privateKey.PublicKey,
+		Inputs:    inputs,
+		Outputs:   outputs,
+		PublicKey: gossiper.publicKey,
 	}
 
 	// Sign it
@@ -196,4 +196,3 @@ func (gossiper *Gossiper) getMaxTxsFromPool() []*Transaction {
 
 	return txs
 }
-

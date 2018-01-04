@@ -17,8 +17,13 @@ func (gossiper *Gossiper) TransactionRoutine(channel <-chan *GossiperPacketSende
 }
 
 func (gossiper *Gossiper) handleTransaction(packet *GossiperPacketSender) error {
-	tx := packet.packet.Transaction
+	tx, err := packet.packet.Transaction.toNormal()
+	if err != nil {
+		return err
+	}
+
 	gossiper.errLogger.Printf("Received new tx from network: %s", packet.from.String())
+	gossiper.errLogger.Println(tx)
 
 	// Verify transaction
 	valid, orphan := gossiper.VerifyTransaction(tx)
@@ -46,8 +51,14 @@ func (gossiper *Gossiper) handleTransaction(packet *GossiperPacketSender) error 
 }
 
 func (gossiper *Gossiper) broadcastTransaction(tx *Transaction) error {
+	// We must convert to SerializableTx because big.Int is not serializable by protobuf
+	serTx, err := tx.toSerializable()
+	if err != nil {
+		return err
+	}
+
 	// Mashall message
-	packet := GossipPacket{Transaction: tx}
+	packet := GossipPacket{Transaction: serTx}
 	buffer, err := protobuf.Encode(&packet)
 	if err != nil {
 		return err

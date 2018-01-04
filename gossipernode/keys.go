@@ -1,7 +1,6 @@
 package gossipernode
 
 import (
-	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/hex"
 	"math/big"
@@ -10,8 +9,29 @@ import (
 	"golang.org/x/crypto/ripemd160"
 )
 
+type PublicKey struct {
+	// Curve is P256
+	X *big.Int
+	Y *big.Int
+}
+
+type SerializedPublicKey struct {
+	X []byte
+	Y []byte
+}
+
+type Sig struct {
+	R *big.Int
+	S *big.Int
+}
+
+type SerializedSig struct {
+	R []byte
+	S []byte
+}
+
 // Public keys
-func PublicKeyToAddress(public ecdsa.PublicKey) string {
+func PublicKeyToAddress(public *PublicKey) string {
 	prefix, _ := hex.DecodeString("04")
 	key := append(public.X.Bytes(), public.Y.Bytes()...)
 	payload := append(prefix, key...)
@@ -28,17 +48,12 @@ func PublicKeyToAddress(public ecdsa.PublicKey) string {
 	return address
 }
 
-func PublicKeyEqual(k1 ecdsa.PublicKey, k2 ecdsa.PublicKey) bool {
+func PublicKeyEqual(k1 *PublicKey, k2 *PublicKey) bool {
 	return k1.X.Cmp(k1.X) == 0 && k2.Y.Cmp(k2.Y) == 0
 }
 
 // Signatures
-type Sig struct {
-	R *big.Int
-	S *big.Int
-}
-
-func (sig Sig) Equal(other Sig) bool {
+func (sig *Sig) Equal(other *Sig) bool {
 	return sig.R.Cmp(other.R) == 0 && sig.S.Cmp(other.S) == 0
 }
 
