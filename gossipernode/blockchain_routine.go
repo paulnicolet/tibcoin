@@ -54,16 +54,6 @@ func addrInList(l []*net.UDPAddr, e *net.UDPAddr) bool {
 	return false
 }
 
-func hashInList(l [][32]byte, e [32]byte) bool {
-	for _, hash := range l {
-
-		if bytes.Equal(hash[:], e[:]) {
-			return true
-		}
-	}
-	return false
-}
-
 func (gossiper *Gossiper) requestBlocksFromInventory(inventory [][32]byte, from *net.UDPAddr) {
 
 	for _, hash := range inventory {
@@ -334,28 +324,48 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 	reply := blockReplyPacket.packet.BlockReply
 	from := blockReplyPacket.from
 
+	// check if we got a block or inventory
+	// first the block
 	if reply.Block != nil {
 
+		// check that the block wasn't corrupted by UDP
 		tmp := reply.Block.hash()
 		corrupted := !bytes.Equal(tmp[:], reply.Hash[:])
 
 		if !corrupted {
+
 			gossiper.blocksMutex.Lock()
 			_, ok := gossiper.blocks[reply.Hash]
 			gossiper.blocksMutex.Unlock()
 
+			// check if we don't already have the block
 			if !ok {
 
 				// TODO verfiy block
 				verify := true
 				if verify {
 
-					// TODO check if we were expecting this block, if no => forward
+					// check if we are expecting this block
+					gossiper.blockInRequestMutex.Lock()
+					_, ok := gossiper.blockInRequest[reply.Hash]
+					gossiper.blockInRequestMutex.Unlock()
+
+					// it's a totally unexpected block =>
+					// it's a recently mined block, needs to forward to our neighboor
+					if !ok {
+						gossiper.peersMutex.Lock()
+						for _, peer := range gossiper.peers {
+							gossiper.sendBlockTo(reply.Block, peer.addr)
+						}
+						gossiper.peersMutex.Unlock()
+					}
+
 					// TODO otpim : check for finer grain lock
 					gossiper.blocksMutex.Lock()
 					gossiper.forksMutex.Lock()
 					gossiper.blockOrphanPoolMutex.Lock()
 
+					// add the block to the big block map
 					gossiper.blocks[reply.Hash] = reply.Block
 
 					// see if we can add this block to one of the top fork
@@ -409,6 +419,12 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 									done = false // found a new top, need to repeat the process again
 								}
 							}
+
+							// remove from orphan if needed
+							if !done {
+								delete(gossiper.blockOrphanPool, currentTopForkHash)
+							}
+
 						}
 
 						// now that the new top fork is at its max, need to compare with current top
@@ -416,6 +432,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 						currentTopBlock := gossiper.blocks[gossiper.topBlock]
 						if currentTopBlock.Height < currentTopForkBlock.Height {
 							gossiper.topBlock = currentTopForkHash
+
 							// TODO warn Valentin
 
 							// TODO optim : new top means that we may remove some orphan
@@ -433,15 +450,20 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 					gossiper.blocksMutex.Unlock()
 
 					return nil
+				} else {
+					return errors.New("Block wrong at verification step")
 				}
+			} else {
+				// we already have the block, no operation
+				return nil
 			}
-
-			return nil
 		} else {
 			return errors.New("Block corrupted")
 		}
 	} else {
+		// we got an inventory
 
+		// first check not corrupted by UDP
 		concatHash := make([]byte, 0)
 		for i := 0; i < len(reply.BlocksHash); i++ {
 			concatHash = append(concatHash, reply.BlocksHash[i][:]...)
@@ -450,6 +472,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 		tmp := sha256.Sum256(concatHash)
 		corrupted := !bytes.Equal(reply.Hash[:], tmp[:])
 
+		// if not corrupted request for all elements in inventory
 		if !corrupted {
 			go gossiper.requestBlocksFromInventory(reply.BlocksHash, from)
 			return nil
