@@ -27,9 +27,7 @@ func (gossiper *Gossiper) Mine(channel <-chan bool) (*Block, error) {
 	previousBlock, _ := gossiper.blocks[prevHash]
 	gossiper.blocksMutex.Unlock()
 
-	gossiper.txPoolMutex.Lock()
-	txs := gossiper.txPool
-	gossiper.txPoolMutex.Unlock()
+	txs := gossiper.getMaxTxsFromPool()
 
 	// Compute the fees
 	fees, feesErr := gossiper.computeFees(txs)
@@ -75,9 +73,7 @@ func (gossiper *Gossiper) Mine(channel <-chan bool) (*Block, error) {
 			previousBlock, _ = gossiper.blocks[prevHash]
 			gossiper.blocksMutex.Unlock()
 
-			gossiper.txPoolMutex.Lock()
-			txs = gossiper.txPool
-			gossiper.txPoolMutex.Unlock()
+			txs = gossiper.getMaxTxsFromPool()
 
 			// Compute the fees
 			fees, feesErr = gossiper.computeFees(txs)
@@ -122,7 +118,8 @@ func (gossiper *Gossiper) Mine(channel <-chan bool) (*Block, error) {
 			gossiper.topBlock = blockHash
 			gossiper.topBlockMutex.Unlock()
 
-			// TODO: What to do with transaction pool?
+			// Filter txPool
+			gossiper.removeBlockTxsFromPool(block)
 
 			resetBlock = true
 		} else {
@@ -159,14 +156,11 @@ func (gossiper *Gossiper) createCoinbaseTx(fees int) (*Transaction, error) {
 		to: PublicKeyToAddress(gossiper.privateKey.PublicKey),
 	}
 
-	// Get public key
-	pubKey := gossiper.privateKey.PublicKey
-
 	// Create tx (unsigned)
 	tx := &Transaction{
 		inputs: inputs,
 		outputs: outputs,
-		publicKey: pubKey,
+		publicKey: gossiper.privateKey.PublicKey,
 	}
 
 	// Sign it
@@ -176,5 +170,30 @@ func (gossiper *Gossiper) createCoinbaseTx(fees int) (*Transaction, error) {
 	}
 
 	return signedTx, nil
+}
+
+// Go in the pool and take as much tx as we can (don't remove anything yet)
+func (gossiper *Gossiper) getMaxTxsFromPool() []*Transaction {
+	gossiper.txPoolMutex.Lock()
+
+	// Take txs until max size or pool empty
+	var txs []*Transaction
+	currentSize := 0
+	idx := 0
+	for currentSize <= MaxBlockSize && idx < len(gossiper.txPool) {
+		currentTx := gossiper.txPool[idx]
+		txs = append(txs, currentTx)
+		currentSize += currentTx.size()
+		idx++
+	}
+
+	// If we put one too much, remove last tx
+	if currentSize > MaxBlockSize {
+		txs = txs[:len(txs)-1]
+	}
+
+	gossiper.txPoolMutex.Unlock()
+
+	return txs
 }
 
