@@ -76,6 +76,25 @@ func (tx *Transaction) equals(other *Transaction) bool {
 	return true
 }
 
+func (tx *Transaction) size() int {
+	size := 0
+
+	// Inputs
+	for _, input := range tx.inputs {
+		size += input.size()
+	}
+
+	// Outputs
+	for _, output := range tx.outputs {
+		size += output.size()
+	}
+
+	// Suppose a big int sizes 8 bytes
+	size += (8 * 4)
+
+	return size
+}
+
 // Transaction inputs internals
 func (in *TxInput) hash() [32]byte {
 	h := sha256.New()
@@ -88,12 +107,33 @@ func (in *TxInput) equals(other *TxInput) bool {
 	return bytes.Equal(in.outputTxHash[:], other.outputTxHash[:]) && in.outputIdx == other.outputIdx
 }
 
+func (in *TxInput) references(tx *Transaction) bool {
+	txHash := tx.hash()
+	return bytes.Equal(txHash[:], in.outputTxHash[:]) && int(in.outputIdx) < len(tx.outputs)
+}
+
+func (in *TxInput) sameOutput(other *TxInput) bool {
+	return bytes.Equal(in.outputTxHash[:], other.outputTxHash[:]) && in.outputIdx == other.outputIdx
+}
+
+func (in *TxInput) sameOutputLocation(other *TxOutputLocation) bool {
+	return bytes.Equal(in.outputTxHash[:], other.outputTxHash[:]) && in.outputIdx == other.outputIdx
+}
+
 // We are looking only in the main branch for a correpsonding transaction
 func (gossiper *Gossiper) getOutput(in *TxInput) (*TxOutput, error) {
-	currentBlock, blockExists := gossiper.blocks[gossiper.topBlock]
+	// Get top block hash
+	gossiper.topBlockMutex.Lock()
+	topBlock := gossiper.topBlock
+	gossiper.topBlockMutex.Unlock()
+
+	// Get top block
+	gossiper.blocksMutex.Lock()
+	currentBlock, blockExists := gossiper.blocks[topBlock]
+	gossiper.blocksMutex.Unlock()
 
 	if !blockExists {
-		return nil, errors.New(fmt.Sprintf("Top block (hash = %x) not found in 'gossiper.blocks'.", gossiper.topBlock[:]))
+		return nil, errors.New(fmt.Sprintf("Top block (hash = %x) not found in 'gossiper.blocks'.", topBlock[:]))
 	}
 
 	for blockExists {
@@ -101,19 +141,70 @@ func (gossiper *Gossiper) getOutput(in *TxInput) (*TxOutput, error) {
 		for _, tx := range currentBlock.Txs {
 			txHash := tx.hash()
 			if bytes.Equal(txHash[:], in.outputTxHash[:]) {
-				if int(in.outputIdx) < len(tx.outputs) {
+				if in.outputIdx < len(tx.outputs) {
 					return tx.outputs[in.outputIdx], nil
 				} else {
-					return nil, errors.New(fmt.Sprintf("Transaction found (hash = %x) but not enough output: expected at least %d, got %d.", txHash[:], in.outputIdx + 1, len(tx.outputs)))
+					return nil, errors.New(fmt.Sprintf("Transaction found (hash = %x) but not enough output: expected at least %d, got %d.", txHash[:], in.outputIdx+1, len(tx.outputs)))
 				}
 			}
 		}
 
 		// Get the previous block
+		gossiper.blocksMutex.Lock()
 		currentBlock, blockExists = gossiper.blocks[currentBlock.PrevHash]
+		gossiper.blocksMutex.Unlock()
 	}
 
 	return nil, errors.New(fmt.Sprintf("Transaction not found in main branch (hash = %x).", in.outputTxHash[:]))
+}
+
+func (gossiper *Gossiper) alreadySpent(outputs []*TxOutputLocation) bool {
+	// Get first hash
+	gossiper.topBlockMutex.Lock()
+	topBlockHash := gossiper.topBlock
+	gossiper.topBlockMutex.Unlock()
+
+	// Get block
+	gossiper.blocksMutex.Lock()
+	currentBlock, blockExists := gossiper.blocks[topBlockHash]
+	gossiper.blocksMutex.Unlock()
+
+	// Look for spent outputs
+	for blockExists {
+		for _, tx := range currentBlock.Txs {
+			for _, input := range tx.inputs {
+				for _, outputLocation := range outputs {
+					if input.sameOutputLocation(outputLocation) {
+						return true
+					}
+				}
+			}
+		}
+
+		gossiper.blocksMutex.Lock()
+		currentBlock, blockExists = gossiper.blocks[currentBlock.PrevHash]
+		gossiper.blocksMutex.Unlock()
+	}
+
+	// Look in the pool
+	gossiper.txPoolMutex.Lock()
+	for _, tx := range gossiper.txPool {
+		for _, input := range tx.inputs {
+			for _, outputLocation := range outputs {
+				if input.sameOutputLocation(outputLocation) {
+					return true
+				}
+			}
+		}
+	}
+	gossiper.txPoolMutex.Unlock()
+
+	return false
+}
+
+func (in *TxInput) size() int {
+	// Hardcode input size
+	return 4 + len(in.outputTxHash)
 }
 
 // Transaction outputs internals
@@ -127,4 +218,9 @@ func (out *TxOutput) hash() [32]byte {
 
 func (out *TxOutput) equals(other *TxOutput) bool {
 	return (out.to == other.to) && out.value == other.value
+}
+
+func (out *TxOutput) size() int {
+	// Hardcode output size
+	return 4 + len([]byte(out.to))
 }

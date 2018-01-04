@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"net"
@@ -89,10 +90,16 @@ type Gossiper struct {
 	blockOrphanPoolMutex   *sync.Mutex
 	txPool                 []*Transaction
 	txPoolMutex            *sync.Mutex
-	blockInRequest         map[[32]byte][]*net.UDPAddr
-	blockInRequestMutex    *sync.Mutex
-	peerNumRequest         map[*net.UDPAddr]int
-	peerNumRequestMutex    *sync.Mutex
+
+	blockInRequest      map[[32]byte][]*net.UDPAddr
+	blockInRequestMutex *sync.Mutex
+	peerNumRequest      map[*net.UDPAddr]int
+	peerNumRequestMutex *sync.Mutex
+
+	orphanTxPool      []*Transaction
+	orphanTxPoolMutex *sync.Mutex
+	target            [32]byte
+	targetMutex       *sync.Mutex
 }
 
 func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDPAddr, peersAddr []*net.UDPAddr, rtimer *time.Duration, noforward bool) (*Gossiper, error) {
@@ -125,8 +132,9 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 
 	// Init first block
 	blocks := make(map[[32]byte]*Block)
-	genesisHash := GenesisBlockHash()
-	blocks[genesisHash] = &GenesisBlock
+	genesisHash := GenesisBlock.hash()
+	blocks[genesisHash] = GenesisBlock
+	initialTarget, _ := hex.DecodeString("00000FFFFFFFFFFF000000000000000000000000000000000000000000000000")
 
 	return &Gossiper{
 		name:                   name,
@@ -166,6 +174,10 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 		blockOrphanPoolMutex:   &sync.Mutex{},
 		txPool:                 make([]*Transaction, 0),
 		txPoolMutex:            &sync.Mutex{},
+		orphanTxPool:           make([]*Transaction, 0),
+		orphanTxPoolMutex:      &sync.Mutex{},
+		target:                 BytesToHash(initialTarget),
+		targetMutex:            &sync.Mutex{},
 	}, nil
 }
 
@@ -181,6 +193,8 @@ func (gossiper *Gossiper) Start() error {
 	searchReplyChannel := make(chan *GossiperPacketSender)
 	blockRequestChannel := make(chan *GossiperPacketSender)
 	blockReplyChannel := make(chan *GossiperPacketSender)
+	transactionChannel := make(chan *GossiperPacketSender)
+	startMiningChannel := make(chan bool)
 
 	// Launch webserver
 	go gossiper.LaunchWebServer()
@@ -190,7 +204,7 @@ func (gossiper *Gossiper) Start() error {
 	go gossiper.Listen(gossiper.gossipConn, gossipChannel)
 
 	// Spawn handler
-	go gossiper.GossiperRoutine(gossipChannel, rumorChannel, statusChannel, privateChannel, dataRequestChannel, dataReplyChannel, searchRequestChannel, searchReplyChannel, blockRequestChannel, blockReplyChannel)
+	go gossiper.GossiperRoutine(gossipChannel, rumorChannel, statusChannel, privateChannel, dataRequestChannel, dataReplyChannel, searchRequestChannel, searchReplyChannel, blockRequestChannel, blockReplyChannel, transactionChannel)
 	go gossiper.CLIRoutine(clientChannel)
 	go gossiper.RumorRoutine(rumorChannel)
 	go gossiper.StatusRoutine(statusChannel)
@@ -199,6 +213,7 @@ func (gossiper *Gossiper) Start() error {
 	go gossiper.DataReplyRoutine(dataReplyChannel)
 	go gossiper.SearchRequestRoutine(searchRequestChannel)
 	go gossiper.SearchReplyRoutine(searchReplyChannel)
+	go gossiper.TransactionRoutine(transactionChannel)
 
 	// Spawn anti-antropy
 	go gossiper.AntiEntropyRoutine()
@@ -206,8 +221,14 @@ func (gossiper *Gossiper) Start() error {
 	// Spawn route rumoring routine
 	go gossiper.RouteRumoringRoutine()
 
+	// Miner
+	go gossiper.Mine(startMiningChannel)
+
 	add := PublicKeyToAddress(gossiper.privateKey.PublicKey)
-	gossiper.errLogger.Printf("Tibcoin address %s", add)
+	gossiper.errLogger.Printf("Tibcoin address %s\n", add)
+
+	// TODO: Do this to start mining. Should we only start when we are up to date and have all the blocks?
+	startMiningChannel <- true
 
 	select {}
 }
