@@ -152,3 +152,24 @@ func (gossiper *Gossiper) shareFile(filename string) error {
 
 	return nil
 }
+
+func (gossiper *Gossiper) createTransaction(value int, to string) error {
+	gossiper.errLogger.Printf("Client tx request: %d tibcoins for %s", value, to)
+	// Generate transaction
+	tx, err := gossiper.NewTransaction(to, value)
+	if err != nil {
+		return err
+	}
+
+	// Verify it
+	// TODO should we verify our own transaction ?
+	//valid, orphan := gossiper.VerifyTransaction(tx)
+
+	// Add to transaction pool
+	gossiper.txPoolMutex.Lock()
+	gossiper.txPool = append(gossiper.txPool, tx)
+	gossiper.txPoolMutex.Unlock()
+
+	// Broadcast transaction
+	return gossiper.broadcastTransaction(tx)
+}
