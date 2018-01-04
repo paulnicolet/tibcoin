@@ -18,6 +18,7 @@ func (gossiper *Gossiper) TransactionRoutine(channel <-chan *GossiperPacketSende
 
 func (gossiper *Gossiper) handleTransaction(packet *GossiperPacketSender) error {
 	tx := packet.packet.Transaction
+	gossiper.errLogger.Printf("Received new tx from network: %s", packet.from.String())
 
 	// Verify transaction
 	valid, orphan := gossiper.VerifyTransaction(tx)

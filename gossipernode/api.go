@@ -154,6 +154,7 @@ func (gossiper *Gossiper) shareFile(filename string) error {
 }
 
 func (gossiper *Gossiper) createTransaction(value int, to string) error {
+	gossiper.errLogger.Printf("Client tx request: %d tibcoins for %s", value, to)
 	// Generate transaction
 	tx, err := gossiper.NewTransaction(to, value)
 	if err != nil {
