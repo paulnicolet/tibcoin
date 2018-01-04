@@ -66,7 +66,9 @@ func (gossiper *Gossiper) NewTransaction(to string, value int) (*Transaction, er
 
 	// Get outputs
 	outputs := gossiper.CollectOutputs()
+	gossiper.errLogger.Printf("Collected UTXOs: %d", len(outputs))
 	unspent := gossiper.FilterSpentOutputs(outputs)
+	gossiper.errLogger.Printf("Collected unspent UTXOs: %d", len(unspent))
 
 	// Add inputs
 	sum := 0
@@ -258,7 +260,7 @@ func (gossiper *Gossiper) computeTxFee(tx *Transaction) (int, error) {
 	// Look for output values
 	outputsCash := 0
 	for _, output := range tx.Outputs {
-		inputsCash += output.Value
+		outputsCash += output.Value
 	}
 
 	// Fee is the difference
@@ -371,7 +373,6 @@ func (gossiper *Gossiper) CollectOutputs() []*TxOutputLocation {
 	gossiper.blocksMutex.Unlock()
 
 	for blockExists {
-		gossiper.errLogger.Printf("Txs in current block %d", len(currentBlock.Txs))
 		for _, tx := range currentBlock.Txs {
 			for idx, output := range tx.Outputs {
 				if output.To == address {
