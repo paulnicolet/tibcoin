@@ -210,8 +210,7 @@ func (gossiper *Gossiper) handleBlockRequest(blockRequestPacket *GossiperPacketS
 				gossiper.blocksMutex.Unlock()
 
 				// loop until we find the requested block, or we reach the genesis block
-				nilHash := BytesToHash(make([]byte, 32))
-				for !bytes.Equal(nilHash[:], currentBlockHash.PrevHash[:]) && !bytes.Equal(currentBlockHash.PrevHash[:], request.BlockHash[:]) {
+				for !bytes.Equal(NilHash[:], currentBlockHash.PrevHash[:]) && !bytes.Equal(currentBlockHash.PrevHash[:], request.BlockHash[:]) {
 
 					// if fifo full, remove the first entered one
 					if counter == INVENTORY_SIZE {

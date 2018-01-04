@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"net"
@@ -98,8 +97,8 @@ type Gossiper struct {
 
 	orphanTxPool      []*Transaction
 	orphanTxPoolMutex *sync.Mutex
-	target            [32]byte
-	targetMutex       *sync.Mutex
+	target            [32]byte // TODO: remove and check in last block for target
+	targetMutex       *sync.Mutex // TODO: remove
 }
 
 func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDPAddr, peersAddr []*net.UDPAddr, rtimer *time.Duration, noforward bool) (*Gossiper, error) {
@@ -134,7 +133,6 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 	blocks := make(map[[32]byte]*Block)
 	genesisHash := GenesisBlock.hash()
 	blocks[genesisHash] = GenesisBlock
-	initialTarget, _ := hex.DecodeString("00000FFFFFFFFFFF000000000000000000000000000000000000000000000000")
 
 	return &Gossiper{
 		name:                   name,
@@ -176,8 +174,8 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 		txPoolMutex:            &sync.Mutex{},
 		orphanTxPool:           make([]*Transaction, 0),
 		orphanTxPoolMutex:      &sync.Mutex{},
-		target:                 BytesToHash(initialTarget),
-		targetMutex:            &sync.Mutex{},
+		target:                 BytesToHash(InitialTarget),// TODO: remove and check in last block for target
+		targetMutex:            &sync.Mutex{},// TODO: remove and check in last block for target
 	}, nil
 }
 
@@ -226,6 +224,37 @@ func (gossiper *Gossiper) Start() error {
 
 	add := PublicKeyToAddress(gossiper.privateKey.PublicKey)
 	gossiper.errLogger.Printf("Tibcoin address %s\n", add)
+
+	// TODO: remove
+
+	/*
+	// Create new block + hash
+	block := GenesisBlock
+	target := block.Target
+	var nonce uint32 = 0
+
+	for {
+		blockHash := block.hash()
+
+		// See if found new valid block
+		if bytes.Compare(blockHash[:], target[:]) < 0 {
+			// Found block!
+			fmt.Printf("[GENESIS] Found new block: %x with nonce = %d.\n", blockHash[:], nonce)
+			break
+		}
+
+		block = &Block{
+			Timestamp: time.Date(2018, 1, 3, 11, 00, 00, 00, time.UTC).Unix(),
+			Height:    0,
+			Nonce:     nonce,
+			Target:    BytesToHash(InitialTarget),
+			PrevHash:  NilHash,
+			Txs:	   make([]*Transaction, 0),
+		}
+
+		nonce++
+	}
+	*/
 
 	// TODO: Do this to start mining. Should we only start when we are up to date and have all the blocks?
 	startMiningChannel <- true

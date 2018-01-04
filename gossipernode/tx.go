@@ -229,7 +229,7 @@ func (gossiper *Gossiper) computeTxFee(tx *Transaction) (int, error) {
 	// Look for output values
 	outputsCash := 0
 	for _, output := range tx.outputs {
-		inputsCash += output.value
+		outputsCash += output.value
 	}
 
 	// Fee is the difference
@@ -394,3 +394,8 @@ func (gossiper *Gossiper) updateOrphansTx(tx *Transaction) {
 		}
 	}
 }
+
+func (tx *Transaction) isCoinbaseTx() bool {
+	return len(coinbaseTx.inputs) == 1 && bytes.Equal(coinbaseTx.inputs[0].outputTxHash[:], NilHash[:]) && coinbaseTx.inputs[0].outputIdx == -1
+}
+
