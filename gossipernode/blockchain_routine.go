@@ -162,7 +162,7 @@ func (gossiper *Gossiper) requestBlock(blockHash [32]byte) {
 			gossiper.blockInRequestMutex.Lock()
 			l := gossiper.blockInRequest[blockHash]
 
-			currentRequestedPeer = l[0] // TODO choose randomly
+			currentRequestedPeer = l[0] // TODO optim: choose randomly
 			gossiper.blockInRequestMutex.Unlock()
 
 			// if any peer is available, send the request
@@ -351,7 +351,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 				if verify {
 
 					// TODO check if we were expecting this block, if no => forward
-					// TODO check for finer grain lock
+					// TODO otpim : check for finer grain lock
 					gossiper.blocksMutex.Lock()
 					gossiper.forksMutex.Lock()
 					gossiper.blockOrphanPoolMutex.Lock()
@@ -418,7 +418,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 							gossiper.topBlock = currentTopForkHash
 							// TODO warn Valentin
 
-							// TODO new top means that we may remove some orphan
+							// TODO optim : new top means that we may remove some orphan
 						}
 						gossiper.topBlockMutex.Unlock()
 
