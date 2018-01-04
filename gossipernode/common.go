@@ -138,6 +138,7 @@ type ClientPacket struct {
 	NewFile           *NewFile
 	DownloadRequest   *DownloadRequest
 	NewSearchRequest  *NewSearchRequest
+	NewTransaction    *NewTransaction
 }
 
 type NewSearchRequest struct {
@@ -177,6 +178,11 @@ type NewPeerMessage struct {
 type DownloadRequest struct {
 	FileName string
 	MetaHash []byte
+}
+
+type NewTransaction struct {
+	To    string
+	Value int
 }
 
 func LocalIP(port string) string {

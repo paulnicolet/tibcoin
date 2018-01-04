@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/dedis/protobuf"
-	"github.com/paulnicolet/tibcoin/common"
+	"github.com/paulnicolet/tibcoin/gossipernode"
 )
 
 const DEFAULT_UI_PORT = "10001"
@@ -22,13 +22,13 @@ func main() {
 	logger := log.New(os.Stderr, "[Client] ", log.Ltime|log.Lshortfile)
 
 	// Parse arguments
-	port, msg, dest, file, keywords, budget, request, err := parseInput(os.Args)
+	port, msg, dest, file, keywords, budget, request, address, tibcoin, err := parseInput(os.Args)
 	if err != nil {
 		logger.Fatal(err)
 	}
 
 	// Resolve local gossiper address
-	gossiperAddr, err := net.ResolveUDPAddr("udp", common.LocalIP(port))
+	gossiperAddr, err := net.ResolveUDPAddr("udp", gossipernode.LocalIP(port))
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -42,20 +42,25 @@ func main() {
 	defer conn.Close()
 
 	// Marshall and send message
-	var packet common.ClientPacket
+	var packet gossipernode.ClientPacket
 	if dest != "" && file == "" {
-		packet = common.ClientPacket{NewPrivateMessage: &common.NewPrivateMessage{Dest: dest, Message: msg}}
+		packet = gossipernode.ClientPacket{NewPrivateMessage: &gossipernode.NewPrivateMessage{Dest: dest, Message: msg}}
 	} else if file != "" && request == nil {
-		packet = common.ClientPacket{NewFile: &common.NewFile{FileName: file}}
+		packet = gossipernode.ClientPacket{NewFile: &gossipernode.NewFile{FileName: file}}
 	} else if len(keywords) != 0 {
-		packet = common.ClientPacket{NewSearchRequest: &common.NewSearchRequest{Keywords: keywords, Budget: budget}}
+		packet = gossipernode.ClientPacket{NewSearchRequest: &gossipernode.NewSearchRequest{Keywords: keywords, Budget: budget}}
 	} else if file != "" && request != nil {
-		packet = common.ClientPacket{DownloadRequest: &common.DownloadRequest{
+		packet = gossipernode.ClientPacket{DownloadRequest: &gossipernode.DownloadRequest{
 			FileName: file,
 			MetaHash: request,
 		}}
+	} else if address != "" && tibcoin != 0 {
+		packet = gossipernode.ClientPacket{NewTransaction: &gossipernode.NewTransaction{
+			To:    address,
+			Value: int(tibcoin),
+		}}
 	} else {
-		packet = common.ClientPacket{NewMessage: &common.NewMessage{Message: msg}}
+		packet = gossipernode.ClientPacket{NewMessage: &gossipernode.NewMessage{Message: msg}}
 	}
 	buffer, err := protobuf.Encode(&packet)
 	if err != nil {
@@ -67,7 +72,7 @@ func main() {
 	}
 }
 
-func parseInput(args []string) (string, string, string, string, []string, uint64, []byte, error) {
+func parseInput(args []string) (string, string, string, string, []string, uint64, []byte, string, uint64, error) {
 	uiPort := flag.String("UIPort", "", "Port on which node is listening for message from client.")
 	msg := flag.String("msg", "", "Message to gossip.")
 	dest := flag.String("Dest", "", "Name of the destination if for a private message.")
@@ -76,10 +81,13 @@ func parseInput(args []string) (string, string, string, string, []string, uint64
 	budget := flag.Int64("budget", DEFAULT_BUDGET, "Budget of the file search request")
 	request := flag.String("request", "", "Metahash of file to download")
 
+	address := flag.String("address", "", "Tibcoin public address")
+	tibcoin := flag.Int64("tibcoin", 0, "Amount of money to send")
+
 	flag.Parse()
 
-	if *msg == "" && *file == "" && *keywords == "" {
-		return "", "", "", "", nil, 0, nil, fmt.Errorf("Missing command line arguments, please see -help for format specifications.")
+	if *msg == "" && *file == "" && *keywords == "" && *address == "" {
+		return "", "", "", "", nil, 0, nil, "", 0, fmt.Errorf("Missing command line arguments, please see -help for format specifications.")
 	}
 
 	if *uiPort == "" {
@@ -89,7 +97,7 @@ func parseInput(args []string) (string, string, string, string, []string, uint64
 
 	// Check local UDP peer port
 	if _, err := strconv.Atoi(*uiPort); err != nil {
-		return "", "", "", "", nil, 0, nil, fmt.Errorf("Invalid port number: %s", *uiPort)
+		return "", "", "", "", nil, 0, nil, "", 0, fmt.Errorf("Invalid port number: %s", *uiPort)
 	}
 
 	// Split keywords
@@ -104,9 +112,9 @@ func parseInput(args []string) (string, string, string, string, []string, uint64
 		hash, err := hex.DecodeString(*request)
 		metahash = hash
 		if err != nil {
-			return "", "", "", "", nil, 0, nil, fmt.Errorf("Invalid metahash")
+			return "", "", "", "", nil, 0, nil, "", 0, fmt.Errorf("Invalid metahash")
 		}
 	}
 
-	return *uiPort, *msg, *dest, *file, keywordsArray, uint64(*budget), metahash, nil
+	return *uiPort, *msg, *dest, *file, keywordsArray, uint64(*budget), metahash, *address, uint64(*tibcoin), nil
 }
