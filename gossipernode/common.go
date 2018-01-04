@@ -29,6 +29,7 @@ type GossipPacket struct {
 	SearchReply   *SearchReply
 	BlockRequest  *BlockRequest
 	BlockReply    *BlockReply
+	Transaction   *Transaction
 }
 
 type File struct {

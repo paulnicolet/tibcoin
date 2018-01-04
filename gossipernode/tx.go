@@ -108,15 +108,16 @@ func (gossiper *Gossiper) NewTransaction(to string, value int) (*Transaction, er
 }
 
 // From Mastering Bitcoin book
-func (gossiper *Gossiper) VerifyTransaction(tx *Transaction) bool {
+// Returns (validated, orphan)
+func (gossiper *Gossiper) VerifyTransaction(tx *Transaction) (bool, bool) {
 	// Check neither in or out lists are empty
 	if len(tx.inputs) == 0 || len(tx.outputs) == 0 {
-		return false
+		return false, false
 	}
 
 	// Check size < block size
 	if tx.size() >= MaxBlockSize {
-		return false
+		return false, false
 	}
 
 	// Each output and total must be in legal money range
@@ -124,12 +125,21 @@ func (gossiper *Gossiper) VerifyTransaction(tx *Transaction) bool {
 	for _, output := range tx.outputs {
 		outputSum += output.value
 		if output.value <= 0 || output.value > MaxCoins {
-			return false
+			return false, false
 		}
 	}
 	if outputSum > MaxCoins {
-		return false
+		return false, false
 	}
+
+	// Make sure it is not already in the tx pool
+	gossiper.txPoolMutex.Lock()
+	for _, other := range gossiper.txPool {
+		if tx.equals(other) {
+			return false, false
+		}
+	}
+	gossiper.txPoolMutex.Unlock()
 
 	// Look for corresponding UTXOs in main branch and tx pool
 	inputSum := 0
@@ -143,7 +153,7 @@ func (gossiper *Gossiper) VerifyTransaction(tx *Transaction) bool {
 		// Check that input values are in legal money range BTW
 		inputSum += output.value
 		if output.value <= 0 || output.value > MaxCoins {
-			return false
+			return false, false
 		}
 
 		// Look in the pool if not found
@@ -177,29 +187,26 @@ func (gossiper *Gossiper) VerifyTransaction(tx *Transaction) bool {
 
 	// If none of the UTXO's is found, reject
 	if allMissing {
-		return false
+		return false, false
 	}
 
 	// Check if found outputs have been spent already
 	if gossiper.alreadySpent(outputs) {
-		return false
+		return false, false
 	}
 
 	// If any is not found, it is an orphan
 	if anyMissing {
-		gossiper.orphanTxPoolMutex.Lock()
-		gossiper.orphanTxPool = append(gossiper.orphanTxPool, tx)
-		gossiper.orphanTxPoolMutex.Unlock()
-		return false
+		return false, true
 	}
 
 	// Check that sum of input > sum of outputs
 	if inputSum <= outputSum {
-		return false
+		return false, false
 	}
 
 	// Check sig against each output
-	return gossiper.checkSig(tx)
+	return gossiper.checkSig(tx), false
 }
 
 // Return an error if an input didn't correspond to any known output in the main branch
@@ -338,4 +345,40 @@ func (gossiper *Gossiper) CollectOutputs() []*TxOutputLocation {
 	}
 
 	return outputs
+}
+
+func (gossiper *Gossiper) updateOrphansTx(tx *Transaction) {
+	// Get a copy of the orphans for validation
+	gossiper.orphanTxPoolMutex.Lock()
+	orphans := make([]*Transaction, len(gossiper.orphanTxPool))
+	copy(orphans, gossiper.orphanTxPool)
+	gossiper.orphanTxPoolMutex.Unlock()
+
+	for _, orphan := range orphans {
+		for _, input := range orphan.inputs {
+			// If orphan references tx, try to validate it
+			if input.references(tx) {
+				valid, _ := gossiper.VerifyTransaction(orphan)
+
+				if valid {
+					// Remove from orphans
+					gossiper.orphanTxPoolMutex.Lock()
+					for i, rem := range gossiper.orphanTxPool {
+						if rem == orphan {
+							gossiper.orphanTxPool = append(gossiper.orphanTxPool[:i], gossiper.orphanTxPool[i+1:]...)
+						}
+					}
+					gossiper.orphanTxPoolMutex.Unlock()
+
+					// Add to transaction pool
+					gossiper.txPoolMutex.Lock()
+					gossiper.txPool = append(gossiper.txPool, orphan)
+					gossiper.txPoolMutex.Unlock()
+
+					// Broadcast tx
+					gossiper.broadcastTransaction(orphan)
+				}
+			}
+		}
+	}
 }

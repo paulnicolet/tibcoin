@@ -187,6 +187,7 @@ func (gossiper *Gossiper) Start() error {
 	searchReplyChannel := make(chan *GossiperPacketSender)
 	blockRequestChannel := make(chan *GossiperPacketSender)
 	blockReplyChannel := make(chan *GossiperPacketSender)
+	transactionChannel := make(chan *GossiperPacketSender)
 	startMiningChannel := make(chan bool)
 
 	// Launch webserver
@@ -197,7 +198,7 @@ func (gossiper *Gossiper) Start() error {
 	go gossiper.Listen(gossiper.gossipConn, gossipChannel)
 
 	// Spawn handler
-	go gossiper.GossiperRoutine(gossipChannel, rumorChannel, statusChannel, privateChannel, dataRequestChannel, dataReplyChannel, searchRequestChannel, searchReplyChannel, blockRequestChannel, blockReplyChannel)
+	go gossiper.GossiperRoutine(gossipChannel, rumorChannel, statusChannel, privateChannel, dataRequestChannel, dataReplyChannel, searchRequestChannel, searchReplyChannel, blockRequestChannel, blockReplyChannel, transactionChannel)
 	go gossiper.CLIRoutine(clientChannel)
 	go gossiper.RumorRoutine(rumorChannel)
 	go gossiper.StatusRoutine(statusChannel)
@@ -206,6 +207,7 @@ func (gossiper *Gossiper) Start() error {
 	go gossiper.DataReplyRoutine(dataReplyChannel)
 	go gossiper.SearchRequestRoutine(searchRequestChannel)
 	go gossiper.SearchReplyRoutine(searchReplyChannel)
+	go gossiper.TransactionRoutine(transactionChannel)
 
 	// Spawn anti-antropy
 	go gossiper.AntiEntropyRoutine()

@@ -43,7 +43,8 @@ func (gossiper *Gossiper) GossiperRoutine(
 	searchRequestChannel chan<- *GossiperPacketSender,
 	searchReplyChannel chan<- *GossiperPacketSender,
 	blockRequestChannel chan<- *GossiperPacketSender,
-	blockReplyChannel chan<- *GossiperPacketSender) {
+	blockReplyChannel chan<- *GossiperPacketSender,
+	transactionChannel chan<- *GossiperPacketSender) {
 	for {
 		packet := <-gossipChannel
 
@@ -74,6 +75,8 @@ func (gossiper *Gossiper) GossiperRoutine(
 			blockRequestChannel <- &GossiperPacketSender{from: packet.from, packet: &gossipPacket}
 		} else if gossipPacket.BlockReply != nil {
 			blockReplyChannel <- &GossiperPacketSender{from: packet.from, packet: &gossipPacket}
+		} else if gossipPacket.Transaction != nil {
+			transactionChannel <- &GossiperPacketSender{from: packet.from, packet: &gossipPacket}
 		} else {
 			gossiper.errLogger.Println(packet.from)
 			gossiper.errLogger.Println("Invalid packet")
