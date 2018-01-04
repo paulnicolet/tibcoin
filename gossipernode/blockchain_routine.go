@@ -43,10 +43,20 @@ func (gossiper *Gossiper) getInventory() {
 	}
 }
 
-func contains(l []*net.UDPAddr, e *net.UDPAddr) bool {
+func addrInList(l []*net.UDPAddr, e *net.UDPAddr) bool {
 	for _, addr := range l {
 
 		if addr.String() == e.String() {
+			return true
+		}
+	}
+	return false
+}
+
+func hashInList(l [][32]byte, e [32]byte) bool {
+	for _, hash := range l {
+
+		if bytes.Equal(hash[:], e[:]) {
 			return true
 		}
 	}
@@ -73,7 +83,7 @@ func (gossiper *Gossiper) requestBlocksFromInventory(inventory [][32]byte, from 
 			if containsOngoingRequest {
 
 				// check if it already in the list
-				if !contains(l, from) {
+				if !addrInList(l, from) {
 					gossiper.blockInRequest[hash] = append(l, from)
 				}
 
@@ -277,23 +287,7 @@ func (gossiper *Gossiper) handleBlockRequest(blockRequestPacket *GossiperPacketS
 			// then check if we know the origin
 			to, containsOrigin := gossiper.peers[request.Origin]
 			if containsOrigin {
-
-				packet := &GossipPacket{
-					BlockReply: &BlockReply{
-						Origin: gossiper.name,
-						Hash:   block.hash(),
-						Block:  block,
-					},
-				}
-
-				buffer, err := protobuf.Encode(&packet)
-				if err != nil {
-					return err
-				}
-
-				_, err = gossiper.gossipConn.WriteToUDP(buffer, to.addr)
-				return err
-
+				return gossiper.sendBlockTo(block, to.addr)
 			} else {
 				return errors.New("Unknown origin")
 			}
@@ -306,6 +300,24 @@ func (gossiper *Gossiper) handleBlockRequest(blockRequestPacket *GossiperPacketS
 	}
 }
 
+func (gossiper *Gossiper) sendBlockTo(block *Block, to *net.UDPAddr) error {
+	packet := &GossipPacket{
+		BlockReply: &BlockReply{
+			Origin: gossiper.name,
+			Hash:   block.hash(),
+			Block:  block,
+		},
+	}
+
+	buffer, err := protobuf.Encode(&packet)
+	if err != nil {
+		return err
+	}
+
+	_, err = gossiper.gossipConn.WriteToUDP(buffer, to)
+	return err
+}
+
 func (gossiper *Gossiper) blockReplyRoutine(channel <-chan *GossiperPacketSender) {
 	for {
 		packet := <-channel
@@ -314,6 +326,15 @@ func (gossiper *Gossiper) blockReplyRoutine(channel <-chan *GossiperPacketSender
 			gossiper.errLogger.Printf("Error processing a block reply: %v", err)
 		}
 	}
+}
+
+func (gossiper *Gossiper) constructBlockChain() (bool, error) {
+
+	// TODO check if orphan can be removed (because connected or too old)
+	// TODO check if new forks appears
+	// TODO check if new top block
+
+	return true, nil
 }
 
 func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSender) error {
@@ -336,13 +357,43 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 				// TODO verfiy block
 				verify := true
 				if verify {
-					gossiper.blocksMutex.Lock()
-					gossiper.blocks[reply.Hash] = reply.Block
-					gossiper.blocksMutex.Unlock()
 
-					// TODO check if orphan can be removed
-					// TODO check if new forks appears
-					// TODO check if new top block
+					// TODO check for finer grain lock
+					gossiper.blocksMutex.Lock()
+					gossiper.forksMutex.Lock()
+					gossiper.blockOrphanPoolMutex.Lock()
+
+					gossiper.blocks[reply.Hash] = reply.Block
+
+					// see if we can add this block to one of the top fork
+					found := false
+					for hashTopFork, _ := range gossiper.forks {
+						if bytes.Equal(reply.Block.PrevHash[:], hashTopFork[:]) {
+							found = true
+						}
+					}
+
+					if found {
+						// fixed point needed to move on we had the possibility to put the new block at the top of a fork
+						for {
+							done, err := gossiper.constructBlockChain()
+
+							if err != nil {
+								gossiper.errLogger.Printf("Error while constructing blockchain: %v", err)
+							}
+
+							if done {
+								break
+							}
+						}
+
+					} else {
+
+					}
+
+					gossiper.blockOrphanPoolMutex.Unlock()
+					gossiper.forksMutex.Unlock()
+					gossiper.blocksMutex.Unlock()
 
 					return nil
 				}
