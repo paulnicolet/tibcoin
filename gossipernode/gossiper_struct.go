@@ -90,8 +90,10 @@ type Gossiper struct {
 	blockOrphanPoolMutex   *sync.Mutex
 	txPool                 []*Transaction
 	txPoolMutex            *sync.Mutex
-	target				   [32]byte
-	targetMutex			   *sync.Mutex
+	orphanTxPool           []*Transaction
+	orphanTxPoolMutex      *sync.Mutex
+	target                 [32]byte
+	targetMutex            *sync.Mutex
 }
 
 func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDPAddr, peersAddr []*net.UDPAddr, rtimer *time.Duration, noforward bool) (*Gossiper, error) {
@@ -166,8 +168,10 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 		blockOrphanPoolMutex:   &sync.Mutex{},
 		txPool:                 make([]*Transaction, 0),
 		txPoolMutex:            &sync.Mutex{},
-		target:					BytesToHash(initialTarget),
-		targetMutex:			&sync.Mutex{},
+		orphanTxPool:           make([]*Transaction, 0),
+		orphanTxPoolMutex:      &sync.Mutex{},
+		target:                 BytesToHash(initialTarget),
+		targetMutex:            &sync.Mutex{},
 	}, nil
 }
 

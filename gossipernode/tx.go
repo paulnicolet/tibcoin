@@ -1,7 +1,6 @@
 package gossipernode
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"errors"
@@ -108,9 +107,8 @@ func (gossiper *Gossiper) NewTransaction(to string, value int) (*Transaction, er
 	return tx, nil
 }
 
+// From Mastering Bitcoin book
 func (gossiper *Gossiper) VerifyTransaction(tx *Transaction) bool {
-	// TODO orphan transactions ?
-	// Simplified version of https://en.bitcoin.it/wiki/Protocol_rules#.22tx.22_messages
 	// Check neither in or out lists are empty
 	if len(tx.inputs) == 0 || len(tx.outputs) == 0 {
 		return false
@@ -121,7 +119,7 @@ func (gossiper *Gossiper) VerifyTransaction(tx *Transaction) bool {
 		return false
 	}
 
-	// Each output must be in legal money range
+	// Each output and total must be in legal money range
 	outputSum := 0
 	for _, output := range tx.outputs {
 		outputSum += output.value
@@ -129,30 +127,15 @@ func (gossiper *Gossiper) VerifyTransaction(tx *Transaction) bool {
 			return false
 		}
 	}
-
-	// Reject if tx already present in the pool
-	// Check that UTXO of each input are not already used by tx in the pool
-	gossiper.txPoolMutex.Lock()
-	for _, other := range gossiper.txPool {
-		if tx.equals(other) {
-			gossiper.txPoolMutex.Unlock()
-			return false
-		}
-
-		for _, otherInput := range other.inputs {
-			for _, input := range tx.inputs {
-				if bytes.Equal(input.outputTxHash[:], otherInput.outputTxHash[:]) && input.outputIdx == otherInput.outputIdx {
-					gossiper.txPoolMutex.Unlock()
-					return false
-				}
-			}
-		}
+	if outputSum > MaxCoins {
+		return false
 	}
-	gossiper.txPoolMutex.Unlock()
 
-	// Look for UTXOs in the main chain or tx pool
+	// Look for corresponding UTXOs in main branch and tx pool
 	inputSum := 0
 	var outputs []*TxOutputLocation
+	anyMissing := false
+	allMissing := true
 	for _, input := range tx.inputs {
 		found := false
 		output, err := gossiper.getOutput(input)
@@ -163,22 +146,23 @@ func (gossiper *Gossiper) VerifyTransaction(tx *Transaction) bool {
 			return false
 		}
 
+		// Look in the pool if not found
 		if err != nil {
-			// Look in the pool if not found
 			gossiper.txPoolMutex.Lock()
 			for _, other := range gossiper.txPool {
-				otherTxHash := other.hash()
-				if bytes.Equal(input.outputTxHash[:], otherTxHash[:]) && input.outputIdx < len(other.outputs) {
+				if input.references(other) {
 					found = true
 					break
 				}
 			}
 			gossiper.txPoolMutex.Unlock()
-
-			if !found {
-				return false
-			}
 		} else {
+			found = true
+		}
+
+		if found {
+			allMissing = false
+
 			// If found, collect output, to check if spent later on (to go only once through the chain)
 			location := &TxOutputLocation{
 				output:       output,
@@ -186,11 +170,26 @@ func (gossiper *Gossiper) VerifyTransaction(tx *Transaction) bool {
 				outputIdx:    input.outputIdx,
 			}
 			outputs = append(outputs, location)
+		} else {
+			anyMissing = true
 		}
 	}
 
-	// Check if outputs have been spent already
+	// If none of the UTXO's is found, reject
+	if allMissing {
+		return false
+	}
+
+	// Check if found outputs have been spent already
 	if gossiper.alreadySpent(outputs) {
+		return false
+	}
+
+	// If any is not found, it is an orphan
+	if anyMissing {
+		gossiper.orphanTxPoolMutex.Lock()
+		gossiper.orphanTxPool = append(gossiper.orphanTxPool, tx)
+		gossiper.orphanTxPoolMutex.Unlock()
 		return false
 	}
 
@@ -198,8 +197,6 @@ func (gossiper *Gossiper) VerifyTransaction(tx *Transaction) bool {
 	if inputSum <= outputSum {
 		return false
 	}
-
-	// Check that tx fee is enough to get into an empty block (WHAT ?)
 
 	// Check sig against each output
 	return gossiper.checkSig(tx)
@@ -282,7 +279,7 @@ func (gossiper *Gossiper) FilterSpentOutputs(outputs []*TxOutputLocation) []*TxO
 		for _, tx := range currentBlock.Txs {
 			for _, input := range tx.inputs {
 				for idx, outputLocation := range outputs {
-					if bytes.Equal(outputLocation.outputTxHash[:], input.outputTxHash[:]) && outputLocation.outputIdx == input.outputIdx {
+					if input.sameOutputLocation(outputLocation) {
 						toRemove = append(toRemove, idx)
 					}
 				}

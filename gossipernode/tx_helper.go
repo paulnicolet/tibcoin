@@ -107,6 +107,19 @@ func (in *TxInput) equals(other *TxInput) bool {
 	return bytes.Equal(in.outputTxHash[:], other.outputTxHash[:]) && in.outputIdx == other.outputIdx
 }
 
+func (in *TxInput) references(tx *Transaction) bool {
+	txHash := tx.hash()
+	return bytes.Equal(txHash[:], in.outputTxHash[:]) && int(in.outputIdx) < len(tx.outputs)
+}
+
+func (in *TxInput) sameOutput(other *TxInput) bool {
+	return bytes.Equal(in.outputTxHash[:], other.outputTxHash[:]) && in.outputIdx == other.outputIdx
+}
+
+func (in *TxInput) sameOutputLocation(other *TxOutputLocation) bool {
+	return bytes.Equal(in.outputTxHash[:], other.outputTxHash[:]) && in.outputIdx == other.outputIdx
+}
+
 // We are looking only in the main branch for a correpsonding transaction
 func (gossiper *Gossiper) getOutput(in *TxInput) (*TxOutput, error) {
 	// Get top block hash
@@ -128,7 +141,7 @@ func (gossiper *Gossiper) getOutput(in *TxInput) (*TxOutput, error) {
 		for _, tx := range currentBlock.Txs {
 			txHash := tx.hash()
 			if bytes.Equal(txHash[:], in.outputTxHash[:]) {
-				if int(in.outputIdx) < len(tx.outputs) {
+				if in.outputIdx < len(tx.outputs) {
 					return tx.outputs[in.outputIdx], nil
 				} else {
 					return nil, errors.New(fmt.Sprintf("Transaction found (hash = %x) but not enough output: expected at least %d, got %d.", txHash[:], in.outputIdx+1, len(tx.outputs)))
@@ -161,7 +174,7 @@ func (gossiper *Gossiper) alreadySpent(outputs []*TxOutputLocation) bool {
 		for _, tx := range currentBlock.Txs {
 			for _, input := range tx.inputs {
 				for _, outputLocation := range outputs {
-					if bytes.Equal(outputLocation.outputTxHash[:], input.outputTxHash[:]) && outputLocation.outputIdx == input.outputIdx {
+					if input.sameOutputLocation(outputLocation) {
 						return true
 					}
 				}
@@ -178,7 +191,7 @@ func (gossiper *Gossiper) alreadySpent(outputs []*TxOutputLocation) bool {
 	for _, tx := range gossiper.txPool {
 		for _, input := range tx.inputs {
 			for _, outputLocation := range outputs {
-				if bytes.Equal(outputLocation.outputTxHash[:], input.outputTxHash[:]) && outputLocation.outputIdx == input.outputIdx {
+				if input.sameOutputLocation(outputLocation) {
 					return true
 				}
 			}
