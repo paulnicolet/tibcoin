@@ -86,7 +86,7 @@ type Gossiper struct {
 	blocksMutex            *sync.Mutex
 	forks                  map[[32]byte]bool
 	forksMutex             *sync.Mutex
-	blockOrphanPool        map[[32]byte]bool
+	blockOrphanPool        map[[32]byte][32]byte
 	blockOrphanPoolMutex   *sync.Mutex
 	txPool                 []*Transaction
 	txPoolMutex            *sync.Mutex
@@ -170,7 +170,7 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 		blocksMutex:            &sync.Mutex{},
 		forks:                  make(map[[32]byte]bool),
 		forksMutex:             &sync.Mutex{},
-		blockOrphanPool:        make(map[[32]byte]bool),
+		blockOrphanPool:        make(map[[32]byte][32]byte),
 		blockOrphanPoolMutex:   &sync.Mutex{},
 		txPool:                 make([]*Transaction, 0),
 		txPoolMutex:            &sync.Mutex{},

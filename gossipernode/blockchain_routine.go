@@ -13,6 +13,7 @@ import (
 const INVENTORY_SIZE = 10
 const REQUEST_INVENTORY_WAIT = 15
 const REQUEST_BLOCK_WAIT = 5
+const DIFF_TO_DELETE_ORPHAN = 10
 
 func (gossiper *Gossiper) getInventory() {
 
@@ -328,15 +329,6 @@ func (gossiper *Gossiper) blockReplyRoutine(channel <-chan *GossiperPacketSender
 	}
 }
 
-func (gossiper *Gossiper) constructBlockChain() (bool, error) {
-
-	// TODO check if orphan can be removed (because connected or too old)
-	// TODO check if new forks appears
-	// TODO check if new top block
-
-	return true, nil
-}
-
 func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSender) error {
 
 	reply := blockReplyPacket.packet.BlockReply
@@ -358,6 +350,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 				verify := true
 				if verify {
 
+					// TODO check if we were expecting this block, if no => forward
 					// TODO check for finer grain lock
 					gossiper.blocksMutex.Lock()
 					gossiper.forksMutex.Lock()
@@ -367,28 +360,72 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 
 					// see if we can add this block to one of the top fork
 					found := false
+					var toRemove [32]byte
 					for hashTopFork, _ := range gossiper.forks {
 						if bytes.Equal(reply.Block.PrevHash[:], hashTopFork[:]) {
 							found = true
+							toRemove = hashTopFork // need to remove this one from fork
 						}
 					}
 
 					if found {
-						// fixed point needed to move on we had the possibility to put the new block at the top of a fork
-						for {
-							done, err := gossiper.constructBlockChain()
 
-							if err != nil {
-								gossiper.errLogger.Printf("Error while constructing blockchain: %v", err)
-							}
+						// add the new height
+						reply.Block.Height = gossiper.blocks[toRemove].Height + 1
 
-							if done {
-								break
+						// replace fork top
+						gossiper.forks[reply.Hash] = true
+						// but remove it from top only if its not the genesis (genesis always one of the top fork)
+						tmp := GenesisBlock.hash()
+						if !bytes.Equal(toRemove[:], tmp[:]) {
+							delete(gossiper.forks, toRemove)
+						}
+
+						// fixed point needed to move on we had the possibility to put the new block at the top of the updated fork
+						currentTopForkHash := reply.Hash
+						currentTopForkBlock := reply.Block
+						done := false
+						for !done {
+
+							// we assume we won't need a new pass at the beginning of each pass
+							done = true
+
+							// we pass over each orphan
+							for hash, prevHash := range gossiper.blockOrphanPool {
+
+								if bytes.Equal(prevHash[:], currentTopForkHash[:]) {
+
+									newBlockTop := gossiper.blocks[hash]
+
+									// add the new height
+									newBlockTop.Height = currentTopForkBlock.Height + 1
+									currentTopForkBlock = newBlockTop
+
+									// replace fork top
+									gossiper.forks[hash] = true
+									delete(gossiper.forks, currentTopForkHash)
+									currentTopForkHash = hash
+
+									done = false // found a new top, need to repeat the process again
+								}
 							}
 						}
 
+						// now that the new top fork is at its max, need to compare with current top
+						gossiper.topBlockMutex.Lock()
+						currentTopBlock := gossiper.blocks[gossiper.topBlock]
+						if currentTopBlock.Height < currentTopForkBlock.Height {
+							gossiper.topBlock = currentTopForkHash
+							// TODO warn Valentin
+
+							// TODO new top means that we may remove some orphan
+						}
+						gossiper.topBlockMutex.Unlock()
+
 					} else {
 
+						// can't find a place to put it, it's an orphan
+						gossiper.blockOrphanPool[reply.Hash] = reply.Block.PrevHash
 					}
 
 					gossiper.blockOrphanPoolMutex.Unlock()
