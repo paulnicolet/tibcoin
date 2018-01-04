@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -40,6 +41,7 @@ var GenesisBlock = &Block{
 	Txs:	   make([]*Transaction, 0),
 }
 
+// See: https://en.bitcoin.it/wiki/Protocol_rules#.22block.22_messages
 func (gossiper *Gossiper) VerifyBlock(block *Block) bool {
 	// Get the hash of the given block
 	blockHash := block.hash()
@@ -141,7 +143,25 @@ func (gossiper *Gossiper) VerifyBlock(block *Block) bool {
 		}
 	}
 
-	// 
+	// Re-verify all transactions (in Bitcoin, only doing 2-4 + verifying MerkleTree)
+	for _, tx := range block.Txs {
+		validTx, _ := gossiper.VerifyTransaction(tx)
+		if !validTx {
+			return false
+		}
+	}
+
+	// Check that target is indeed the one it should be (checking previous block to see that)
+	// TODO: change this if target change over time, should compute the expected target from the previous
+	// block and check that the current target is indeed what was expected.
+	if !bytes.Equal(prevBlock.Target[:], block.Target[:]) {
+		return false
+	}
+
+	// Reject if timestamp is the median time of the last 11 blocks or before
+	// TODO (maybe): might change the number of blocks to check for that (currently 11)
+
+	// TODO rest
 
 
 	return true
