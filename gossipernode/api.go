@@ -161,9 +161,7 @@ func (gossiper *Gossiper) createTransaction(value int, to string) error {
 		return err
 	}
 
-	// Verify it
-	// TODO should we verify our own transaction ?
-	//valid, orphan := gossiper.VerifyTransaction(tx)
+	gossiper.errLogger.Println(tx)
 
 	// Add to transaction pool
 	gossiper.txPoolMutex.Lock()
