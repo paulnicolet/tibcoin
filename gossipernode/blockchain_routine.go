@@ -481,7 +481,14 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 							// Warn Miner that he lost the round
 							gossiper.miningChannel <- true
 
-							// TODO optim : new top means that we may remove some orphan
+							// new top means that we may remove some orphan
+							for hash, _ := range gossiper.blockOrphanPool {
+
+								orphanBlock := gossiper.blocks[hash]
+								if gossiper.topBlock-orphanBlock.Height >= DIFF_TO_DELETE_ORPHAN {
+									// TODO delete from orphan AND blocks
+								}
+							}
 						}
 						gossiper.topBlockMutex.Unlock()
 
