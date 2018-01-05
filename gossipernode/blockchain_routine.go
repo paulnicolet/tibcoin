@@ -414,10 +414,9 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 						loggerMsg += " It's a requested block."
 					}
 
-					// TODO otpim : check for finer grain lock
+					// modifying the blockchain, if needed
 					gossiper.blocksMutex.Lock()
 					gossiper.forksMutex.Lock()
-					gossiper.blockOrphanPoolMutex.Lock()
 
 					// add the block to the big block map
 					gossiper.blocks[reply.Hash] = block
@@ -433,6 +432,8 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 					}
 
 					if found {
+
+						gossiper.blockOrphanPoolMutex.Lock()
 
 						loggerMsg = fmt.Sprintf(loggerMsg+" It's put at the top of %x", toRemove[:])
 
@@ -480,6 +481,8 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 
 						}
 
+						gossiper.forksMutex.Unlock()
+
 						// now that the new top fork is at its max, need to compare with current top
 						gossiper.topBlockMutex.Lock()
 						currentTopBlock := gossiper.blocks[gossiper.topBlock]
@@ -509,17 +512,21 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 						}
 						gossiper.topBlockMutex.Unlock()
 
+						gossiper.orphanTxPoolMutex.Unlock()
+						gossiper.blocksMutex.Unlock()
+
 					} else {
 
+						gossiper.forksMutex.Unlock()
+						gossiper.blocksMutex.Unlock()
+
 						// can't find a place to put it, it's an orphan
+						gossiper.blockOrphanPoolMutex.Lock()
 						gossiper.blockOrphanPool[reply.Hash] = reply.Block.PrevHash
+						gossiper.blockOrphanPoolMutex.Unlock()
 
 						loggerMsg += " It's put in the orphan pool."
 					}
-
-					gossiper.blockOrphanPoolMutex.Unlock()
-					gossiper.forksMutex.Unlock()
-					gossiper.blocksMutex.Unlock()
 
 					gossiper.errLogger.Printf(loggerMsg)
 
