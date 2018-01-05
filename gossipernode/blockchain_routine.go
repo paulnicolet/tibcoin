@@ -362,7 +362,6 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 			// check if we don't already have the block
 			if !ok {
 
-				// TODO verfiy block
 				verify := gossiper.VerifyBlock(reply.Block)
 				if verify {
 
