@@ -129,10 +129,14 @@ func (gossiper *Gossiper) VerifyTx(tx *Tx) (bool, bool) {
 		return false, false
 	}
 
+	gossiper.errLogger.Println(1)
+
 	// Check size < block size
 	if tx.size() >= MaxBlockSize {
 		return false, false
 	}
+
+	gossiper.errLogger.Println(2)
 
 	// Each output and total must be in legal money range
 	outputSum := 0
@@ -143,9 +147,13 @@ func (gossiper *Gossiper) VerifyTx(tx *Tx) (bool, bool) {
 		}
 	}
 
+	gossiper.errLogger.Println(3)
+
 	if outputSum > MaxCoins {
 		return false, false
 	}
+
+	gossiper.errLogger.Println(4)
 
 	// Make sure it is not already in the tx pool
 	gossiper.txPoolMutex.Lock()
@@ -156,10 +164,14 @@ func (gossiper *Gossiper) VerifyTx(tx *Tx) (bool, bool) {
 	}
 	gossiper.txPoolMutex.Unlock()
 
+	gossiper.errLogger.Println(4)
+
 	// Cut short if coinbase tx
 	if tx.isCoinbaseTx() {
 		return gossiper.checkSig(tx), false
 	}
+
+	gossiper.errLogger.Println(5)
 
 	// Look for corresponding UTXOs in main branch and tx pool
 	inputSum := 0
@@ -205,25 +217,35 @@ func (gossiper *Gossiper) VerifyTx(tx *Tx) (bool, bool) {
 		}
 	}
 
+	gossiper.errLogger.Println(6)
+
 	// If none of the UTXO's is found, reject
 	if allMissing {
 		return false, false
 	}
+
+	gossiper.errLogger.Println(7)
 
 	// Check if found outputs have been spent already
 	if gossiper.alreadySpent(outputs) {
 		return false, false
 	}
 
+	gossiper.errLogger.Println(8)
+
 	// If any is not found, it is an orphan
 	if anyMissing {
 		return false, true
 	}
 
+	gossiper.errLogger.Println(9)
+
 	// Check that sum of input > sum of outputs
 	if inputSum <= outputSum {
 		return false, false
 	}
+
+	gossiper.errLogger.Println(10)
 
 	// Check sig against each output
 	return gossiper.checkSig(tx), false
