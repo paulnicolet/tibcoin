@@ -3,6 +3,7 @@ package gossipernode
 import (
 	"bytes"
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"errors"
 	"math"
@@ -38,8 +39,8 @@ type Tx struct {
 type SerializableTx struct {
 	Inputs    []*TxInput
 	Outputs   []*TxOutput
-	Sig       *SerializedSig
-	PublicKey *SerializedPublicKey
+	Sig       []byte
+	PublicKey []byte
 }
 
 type TxInput struct {
@@ -307,6 +308,7 @@ func (gossiper *Gossiper) checkSig(tx *Tx) bool {
 		ecdsaPublicKey := &ecdsa.PublicKey{
 			X:     tx.PublicKey.X,
 			Y:     tx.PublicKey.Y,
+			Curve: elliptic.P256(),
 		}
 		if !ecdsa.Verify(ecdsaPublicKey, signable[:], tx.Sig.R, tx.Sig.S) {
 			return false
