@@ -1,4 +1,5 @@
 const BLOCKS_UPDATE_INTERVAL = 5 * 1000
+const BALANCE_UPDATE_INTERVAL = 6 * 1000
 
 var blockchain = {}
 
@@ -13,6 +14,7 @@ $(document).ready(() => {
     });
 
     setInterval(updateBlocks, BLOCKS_UPDATE_INTERVAL);
+    setInterval(updateBalance, BALANCE_UPDATE_INTERVAL);
 });
 
 function updateBlocks() {
@@ -87,6 +89,19 @@ function appendBlock(block) {
 
         $('#offcanvas-container').append(offcanvas);
     }
+}
+
+function updateBalance() {
+    $.ajax({
+		type: "GET",
+		url: "/balance",
+    })
+    .fail(function() {
+        console.log('Could not update balance')
+    })
+    .done(function(data) {
+        $('#balance').html(JSON.parse(data)["balance"]);
+	});
 }
 
 function submitTx() {

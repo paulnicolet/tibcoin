@@ -31,6 +31,7 @@ func (gossiper *Gossiper) LaunchWebServer() {
 	r.HandleFunc("/private-chat", gossiper.PrivateChatHandler).Methods("GET")
 	r.HandleFunc("/matches", gossiper.MatchesHandler).Methods("GET")
 	r.HandleFunc("/blockchain", gossiper.GetBlockchainHandler).Methods("GET")
+	r.HandleFunc("/balance", gossiper.GetBalanceHandler).Methods("GET")
 
 	// Serve static files
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./gossipernode/static/")))
@@ -149,6 +150,26 @@ func (gossiper *Gossiper) PrivateChatHandler(w http.ResponseWriter, r *http.Requ
 func (gossiper *Gossiper) GetBlockchainHandler(w http.ResponseWriter, r *http.Request) {
 	blocks := gossiper.getBlockchain()
 	m := map[string]interface{}{"blocks": blocks}
+
+	payload, err := json.Marshal(m)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(payload)
+}
+
+func (gossiper *Gossiper) GetBalanceHandler(w http.ResponseWriter, r *http.Request) {
+	outputs := gossiper.CollectOutputs()
+	unspent := gossiper.FilterSpentOutputs(outputs)
+
+	balance := 0
+	for _, output := range unspent {
+		balance += output.Output.Value
+	}
+
+	m := map[string]interface{}{"balance": balance}
 
 	payload, err := json.Marshal(m)
 	if err != nil {
