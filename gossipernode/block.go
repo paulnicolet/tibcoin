@@ -73,7 +73,9 @@ func (gossiper *Gossiper) VerifyBlock(block *Block) bool {
 
 	// Check syntactic correctness?
 
+	// TODO: really needed? it seems already done before calling that by checking in 'blocks'
 	// Reject if duplicate of block in main branch
+	/*
 	currentBlock := prevBlock
 	for blockExists {
 		currentHash := currentBlock.hash()
@@ -122,6 +124,7 @@ func (gossiper *Gossiper) VerifyBlock(block *Block) bool {
 		}
 	}
 	gossiper.blockOrphanPoolMutex.Unlock()
+	*/
 
 	// Tx list must be non-empty (except for genesisBlock in our case)
 	if !bytes.Equal(NilHash[:], block.PrevHash[:]) && len(block.Txs) == 0 {
