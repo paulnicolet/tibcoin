@@ -103,6 +103,7 @@ func (gossiper *Gossiper) Mine() (*Block, error) {
 			Nonce:     nonce,
 			PrevHash:  prevHash,
 			Txs:       newTxs,
+			Target:    BytesToHash(InitialTarget),
 		}
 
 		blockHash := block.hash()

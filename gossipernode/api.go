@@ -179,6 +179,7 @@ type BlockWithHash struct {
 	Height    uint32
 	Nonce     uint32
 	PrevHash  string
+	Target    string
 	Txs       []*TxWithHash
 }
 
@@ -216,6 +217,7 @@ func (gossiper *Gossiper) getBlockchain() []*BlockWithHash {
 			Height:    currentBlock.Height,
 			Nonce:     currentBlock.Nonce,
 			PrevHash:  hex.EncodeToString(currentBlock.PrevHash[:]),
+			Target:    hex.EncodeToString(currentBlock.Target[:]),
 			Txs:       txs,
 		})
 		currentBlock, hasNextBlock = gossiper.blocks[currentBlock.PrevHash]
