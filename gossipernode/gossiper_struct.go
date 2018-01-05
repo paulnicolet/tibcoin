@@ -91,15 +91,17 @@ type Gossiper struct {
 	txPool                 []*Transaction
 	txPoolMutex            *sync.Mutex
 
-	blockInRequest      map[[32]byte][]*net.UDPAddr
-	blockInRequestMutex *sync.Mutex
-	peerNumRequest      map[*net.UDPAddr]int
-	peerNumRequestMutex *sync.Mutex
+	blockInRequest         map[[32]byte][]*net.UDPAddr
+	blockInRequestMutex    *sync.Mutex
+	peerNumRequest         map[*net.UDPAddr]int
+	peerNumRequestMutex    *sync.Mutex
 
-	orphanTxPool      []*Transaction
-	orphanTxPoolMutex *sync.Mutex
-	target            [32]byte    // TODO: remove and check in last block for target
-	targetMutex       *sync.Mutex // TODO: remove
+	orphanTxPool      	   []*Transaction
+	orphanTxPoolMutex 	   *sync.Mutex
+	target            	   [32]byte    // TODO: remove and check in last block for target
+	targetMutex       	   *sync.Mutex // TODO: remove
+
+	miningChannel	   	   chan bool
 }
 
 func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDPAddr, peersAddr []*net.UDPAddr, rtimer *time.Duration, noforward bool) (*Gossiper, error) {
@@ -182,6 +184,7 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 		orphanTxPoolMutex:      &sync.Mutex{},
 		target:                 BytesToHash(InitialTarget), // TODO: remove and check in last block for target
 		targetMutex:            &sync.Mutex{},              // TODO: remove and check in last block for target
+		miningChannel:			make(chan bool),
 	}, nil
 }
 
@@ -198,7 +201,6 @@ func (gossiper *Gossiper) Start() error {
 	blockRequestChannel := make(chan *GossiperPacketSender)
 	blockReplyChannel := make(chan *GossiperPacketSender)
 	transactionChannel := make(chan *GossiperPacketSender)
-	startMiningChannel := make(chan bool)
 
 	// Launch webserver
 	go gossiper.LaunchWebServer()
@@ -226,7 +228,7 @@ func (gossiper *Gossiper) Start() error {
 	go gossiper.RouteRumoringRoutine()
 
 	// Miner
-	go gossiper.Mine(startMiningChannel)
+	go gossiper.Mine()
 
 	add := PublicKeyToAddress(gossiper.publicKey)
 	gossiper.errLogger.Printf("Tibcoin address %s\n", add)
@@ -263,7 +265,7 @@ func (gossiper *Gossiper) Start() error {
 	*/
 
 	// TODO: Do this to start mining. Should we only start when we are up to date and have all the blocks?
-	startMiningChannel <- true
+	gossiper.miningChannel <- true
 
 	select {}
 }

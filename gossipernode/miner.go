@@ -8,9 +8,9 @@ import (
 
 const BaseReward = 1000
 
-func (gossiper *Gossiper) Mine(channel <-chan bool) (*Block, error) {
+func (gossiper *Gossiper) Mine() (*Block, error) {
 	// Wait the first time for the channel
-	<-channel
+	<-gossiper.miningChannel
 
 	fmt.Println("Started mining node.")
 
@@ -54,7 +54,7 @@ func (gossiper *Gossiper) Mine(channel <-chan bool) (*Block, error) {
 
 	for {
 		select {
-		case <-channel:
+		case <-gossiper.miningChannel:
 			resetBlock = true
 		default:
 			// Do nothing
@@ -121,6 +121,13 @@ func (gossiper *Gossiper) Mine(channel <-chan bool) (*Block, error) {
 
 			// Filter txPool
 			gossiper.removeBlockTxsFromPool(block)
+
+			// Broadcast to peers
+			gossiper.peersMutex.Lock()
+			for _, peer := range gossiper.peers {
+				gossiper.sendBlockTo(block, peer.addr)
+			}
+			gossiper.peersMutex.Unlock()
 
 			resetBlock = true
 		} else {
