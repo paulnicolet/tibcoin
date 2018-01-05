@@ -321,7 +321,7 @@ func (gossiper *Gossiper) sendBlockTo(block *Block, to *net.UDPAddr) error {
 		},
 	}
 
-	buffer, err := protobuf.Encode(&packet)
+	buffer, err := protobuf.Encode(packet)
 	if err != nil {
 		gossiper.errLogger.Println(err)
 		return err
