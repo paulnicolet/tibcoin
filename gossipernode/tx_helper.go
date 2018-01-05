@@ -2,7 +2,6 @@ package gossipernode
 
 import (
 	"bytes"
-	"crypto/elliptic"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -100,46 +99,33 @@ func (tx *Tx) size() int {
 
 func (tx *Tx) toSerializable() (*SerializableTx, error) {
 
-	R, _ := tx.Sig.R.MarshalJSON()
-	S, _ := tx.Sig.S.MarshalJSON()
-	/*
-		X, err3 := tx.PublicKey.X.MarshalJSON()
-		Y, err4 := tx.PublicKey.Y.MarshalJSON()
-		if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
-			return nil, errors.New("Could not serialize R, S, X or Y")
-		}*/
+	R, err1 := tx.Sig.R.MarshalJSON()
+	S, err2 := tx.Sig.S.MarshalJSON()
+	X, err3 := tx.PublicKey.X.MarshalJSON()
+	Y, err4 := tx.PublicKey.Y.MarshalJSON()
+	if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
+		return nil, errors.New("Could not serialize R, S, X or Y")
+	}
 
 	serTx := &SerializableTx{
 		Inputs:    tx.Inputs,
 		Outputs:   tx.Outputs,
-		PublicKey: elliptic.Marshal(elliptic.P256(), tx.PublicKey.X, tx.PublicKey.Y), //&SerializedSig{R: R, S: S},
-		Sig:       &SerializedSig{R: R, S: S},                                        //&SerializedPublicKey{X: X, Y: Y},
+		Sig:       &SerializedSig{R: R, S: S},
+		PublicKey: &SerializedPublicKey{X: X, Y: Y},
 	}
-
-	fmt.Printf("ideoidide %v", tx.PublicKey.X)
-	fmt.Printf("OYYOYOYO %v", serTx.PublicKey)
 
 	return serTx, nil
 }
 
 func (tx *SerializableTx) toNormal() (*Tx, error) {
-	R, S := &big.Int{}, &big.Int{} //, &big.Int{}, &big.Int{}
-	R.UnmarshalJSON(tx.Sig.R)
-	S.UnmarshalJSON(tx.Sig.S)
-
-	/*
-		err3 := X.UnmarshalJSON(tx.PublicKey.X)
-		err4 := Y.UnmarshalJSON(tx.PublicKey.Y)
-		if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
-			return nil, errors.New("Could not deserialize R, S, X or Y")
-		}*/
-
-	X, Y := elliptic.Unmarshal(elliptic.P256(), tx.PublicKey)
-	fmt.Printf("HEHEHEHE %v", tx.PublicKey)
-	fmt.Printf("HEHEHEHE %v", X)
-	//R, S := elliptic.Unmarshal(elliptic.P256(), tx.Sig)
-
-	fmt.Printf("HEHEHEHE %v", R)
+	R, S, X, Y := &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}
+	err1 := R.UnmarshalJSON(tx.Sig.R)
+	err2 := S.UnmarshalJSON(tx.Sig.S)
+	err3 := X.UnmarshalJSON(tx.PublicKey.X)
+	err4 := Y.UnmarshalJSON(tx.PublicKey.Y)
+	if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
+		return nil, errors.New("Could not deserialize R, S, X or Y")
+	}
 
 	newTx := &Tx{
 		Inputs:    tx.Inputs,

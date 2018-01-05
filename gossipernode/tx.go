@@ -40,7 +40,7 @@ type SerializableTx struct {
 	Inputs    []*TxInput
 	Outputs   []*TxOutput
 	Sig       *SerializedSig
-	PublicKey []byte
+	PublicKey *SerializedPublicKey
 }
 
 type TxInput struct {
