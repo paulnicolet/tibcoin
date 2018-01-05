@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"math/rand"
 	"net"
 	"time"
 
@@ -157,9 +158,23 @@ func (gossiper *Gossiper) requestBlock(blockHash [32]byte) {
 		} else {
 
 			gossiper.blockInRequestMutex.Lock()
+			gossiper.peerNumRequestMutex.Lock()
 			l := gossiper.blockInRequest[blockHash]
 
-			currentRequestedPeer = l[0] // TODO optim: choose randomly
+			randomIdx := rand.Intn(len(l))
+			currentIdx := randomIdx
+
+			var currentRequestedPeer *net.UDPAddr
+			currentRequestedPeer = nil
+
+			for currentRequestedPeer != nil && (currentIdx+1)%len(l) != randomIdx {
+				currentRequestedPeer = l[currentIdx%len(l)]
+				if gossiper.peerNumRequest[currentRequestedPeer] < REQUEST_BLOCK_WAIT {
+					currentRequestedPeer = nil
+				}
+				currentIdx++
+			}
+			gossiper.peerNumRequestMutex.Unlock()
 			gossiper.blockInRequestMutex.Unlock()
 
 			// if any peer is available, send the request
@@ -374,7 +389,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 			// check if we don't already have the block
 			if !ok {
 
-				// TODO verfiy block
+				// verfiy block
 				verify := gossiper.VerifyBlock(block)
 				if verify {
 
@@ -399,10 +414,9 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 						loggerMsg += " It's a requested block."
 					}
 
-					// TODO otpim : check for finer grain lock
+					// modifying the blockchain, if needed
 					gossiper.blocksMutex.Lock()
 					gossiper.forksMutex.Lock()
-					gossiper.blockOrphanPoolMutex.Lock()
 
 					// add the block to the big block map
 					gossiper.blocks[reply.Hash] = block
@@ -418,6 +432,8 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 					}
 
 					if found {
+
+						gossiper.blockOrphanPoolMutex.Lock()
 
 						loggerMsg = fmt.Sprintf(loggerMsg+" It's put at the top of %x", toRemove[:])
 
@@ -465,6 +481,8 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 
 						}
 
+						gossiper.forksMutex.Unlock()
+
 						// now that the new top fork is at its max, need to compare with current top
 						gossiper.topBlockMutex.Lock()
 						currentTopBlock := gossiper.blocks[gossiper.topBlock]
@@ -484,29 +502,31 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 							gossiper.miningChannel <- true
 
 							// new top means that we may remove some orphan
-							/*
-								for hash, _ := range gossiper.blockOrphanPool {
-
-									//orphanBlock := gossiper.blocks[hash]
-									//if gossiper.topBlock. -orphanBlock.Height >= DIFF_TO_DELETE_ORPHAN {
-									// TODO delete from orphan AND blocks
-									//}
+							for hash, _ := range gossiper.blockOrphanPool {
+								orphanBlock := gossiper.blocks[hash]
+								if currentTopBlock.Height-orphanBlock.Height >= DIFF_TO_DELETE_ORPHAN {
+									delete(gossiper.blocks, hash)
+									delete(gossiper.blockOrphanPool, hash)
 								}
-							*/
+							}
 						}
 						gossiper.topBlockMutex.Unlock()
 
+						gossiper.orphanTxPoolMutex.Unlock()
+						gossiper.blocksMutex.Unlock()
+
 					} else {
 
+						gossiper.forksMutex.Unlock()
+						gossiper.blocksMutex.Unlock()
+
 						// can't find a place to put it, it's an orphan
+						gossiper.blockOrphanPoolMutex.Lock()
 						gossiper.blockOrphanPool[reply.Hash] = reply.Block.PrevHash
+						gossiper.blockOrphanPoolMutex.Unlock()
 
 						loggerMsg += " It's put in the orphan pool."
 					}
-
-					gossiper.blockOrphanPoolMutex.Unlock()
-					gossiper.forksMutex.Unlock()
-					gossiper.blocksMutex.Unlock()
 
 					gossiper.errLogger.Printf(loggerMsg)
 
