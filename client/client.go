@@ -55,7 +55,7 @@ func main() {
 			MetaHash: request,
 		}}
 	} else if address != "" && tibcoin != 0 {
-		packet = gossipernode.ClientPacket{NewTransaction: &gossipernode.NewTransaction{
+		packet = gossipernode.ClientPacket{NewTx: &gossipernode.NewTx{
 			To:    address,
 			Value: int(tibcoin),
 		}}

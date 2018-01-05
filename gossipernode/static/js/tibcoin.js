@@ -101,7 +101,7 @@ function submitTx() {
     .done(function() {
         $('#to-input').val("");
         $('#value-input').val("");
-		UIkit.notification('Transaction added to the pool 🎉', {status: 'success', pos: 'top-right'});
+		UIkit.notification('Tx added to the pool 🎉', {status: 'success', pos: 'top-right'});
 	});
 }
 

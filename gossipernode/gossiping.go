@@ -75,7 +75,7 @@ func (gossiper *Gossiper) GossiperRoutine(
 			blockRequestChannel <- &GossiperPacketSender{from: packet.from, packet: &gossipPacket}
 		} else if gossipPacket.BlockReply != nil {
 			blockReplyChannel <- &GossiperPacketSender{from: packet.from, packet: &gossipPacket}
-		} else if gossipPacket.Transaction != nil {
+		} else if gossipPacket.Tx != nil {
 			transactionChannel <- &GossiperPacketSender{from: packet.from, packet: &gossipPacket}
 		} else {
 			gossiper.errLogger.Println(packet.from)

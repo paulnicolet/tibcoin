@@ -29,7 +29,7 @@ In our case only P2PKH is used, and we remove scripting:
 
 const FeeRatio = float64(0.02)
 
-type Transaction struct {
+type Tx struct {
 	Inputs    []*TxInput
 	Outputs   []*TxOutput
 	Sig       *Sig
@@ -59,9 +59,9 @@ type TxOutputLocation struct {
 	OutputIdx    int
 }
 
-func (gossiper *Gossiper) NewTransaction(to string, value int) (*Transaction, error) {
+func (gossiper *Gossiper) NewTx(to string, value int) (*Tx, error) {
 	// Create new transaction
-	tx := &Transaction{
+	tx := &Tx{
 		PublicKey: gossiper.publicKey,
 	}
 
@@ -120,7 +120,7 @@ func (gossiper *Gossiper) NewTransaction(to string, value int) (*Transaction, er
 
 // From Mastering Bitcoin book
 // Returns (validated, orphan)
-func (gossiper *Gossiper) VerifyTransaction(tx *Transaction) (bool, bool) {
+func (gossiper *Gossiper) VerifyTx(tx *Tx) (bool, bool) {
 	gossiper.errLogger.Println("Verifying tx...")
 
 	gossiper.errLogger.Println(1)
@@ -246,7 +246,7 @@ func (gossiper *Gossiper) VerifyTransaction(tx *Transaction) (bool, bool) {
 }
 
 // Return an error if an input didn't correspond to any known output in the main branch
-func (gossiper *Gossiper) computeTxFee(tx *Transaction) (int, error) {
+func (gossiper *Gossiper) computeTxFee(tx *Tx) (int, error) {
 	// Look for input values
 	inputsCash := 0
 	for _, input := range tx.Inputs {
@@ -268,7 +268,7 @@ func (gossiper *Gossiper) computeTxFee(tx *Transaction) (int, error) {
 	return inputsCash - outputsCash, nil
 }
 
-func (gossiper *Gossiper) signTx(tx *Transaction) (*Transaction, error) {
+func (gossiper *Gossiper) signTx(tx *Tx) (*Tx, error) {
 	signable := tx.getSignable()
 	r, s, err := ecdsa.Sign(rand.Reader, gossiper.privateKey, signable[:])
 	if err != nil {
@@ -279,7 +279,7 @@ func (gossiper *Gossiper) signTx(tx *Transaction) (*Transaction, error) {
 	return tx, nil
 }
 
-func (gossiper *Gossiper) checkSig(tx *Transaction) bool {
+func (gossiper *Gossiper) checkSig(tx *Tx) bool {
 	// Check tx signature against each UTXO
 	address := PublicKeyToAddress(tx.PublicKey)
 	signable := tx.getSignable()
@@ -395,10 +395,10 @@ func (gossiper *Gossiper) CollectOutputs() []*TxOutputLocation {
 	return outputs
 }
 
-func (gossiper *Gossiper) updateOrphansTx(tx *Transaction) {
+func (gossiper *Gossiper) updateOrphansTx(tx *Tx) {
 	// Get a copy of the orphans for validation
 	gossiper.orphanTxPoolMutex.Lock()
-	orphans := make([]*Transaction, len(gossiper.orphanTxPool))
+	orphans := make([]*Tx, len(gossiper.orphanTxPool))
 	copy(orphans, gossiper.orphanTxPool)
 	gossiper.orphanTxPoolMutex.Unlock()
 
@@ -406,7 +406,7 @@ func (gossiper *Gossiper) updateOrphansTx(tx *Transaction) {
 		for _, input := range orphan.Inputs {
 			// If orphan references tx, try to validate it
 			if input.references(tx) {
-				valid, _ := gossiper.VerifyTransaction(orphan)
+				valid, _ := gossiper.VerifyTx(orphan)
 
 				if valid {
 					// Remove from orphans
@@ -424,13 +424,13 @@ func (gossiper *Gossiper) updateOrphansTx(tx *Transaction) {
 					gossiper.txPoolMutex.Unlock()
 
 					// Broadcast tx
-					gossiper.broadcastTransaction(orphan)
+					gossiper.broadcastTx(orphan)
 				}
 			}
 		}
 	}
 }
 
-func (tx *Transaction) isCoinbaseTx() bool {
+func (tx *Tx) isCoinbaseTx() bool {
 	return len(tx.Inputs) == 1 && bytes.Equal(tx.Inputs[0].OutputTxHash[:], NilHash[:]) && tx.Inputs[0].OutputIdx == -1
 }

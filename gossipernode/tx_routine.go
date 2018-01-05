@@ -6,18 +6,18 @@ import (
 	"github.com/dedis/protobuf"
 )
 
-func (gossiper *Gossiper) TransactionRoutine(channel <-chan *GossiperPacketSender) {
+func (gossiper *Gossiper) TxRoutine(channel <-chan *GossiperPacketSender) {
 	for {
 		packet := <-channel
-		err := gossiper.handleTransaction(packet)
+		err := gossiper.handleTx(packet)
 		if err != nil {
 			gossiper.errLogger.Printf("Error processing the transaction: %v", err)
 		}
 	}
 }
 
-func (gossiper *Gossiper) handleTransaction(packet *GossiperPacketSender) error {
-	tx, err := packet.packet.Transaction.toNormal()
+func (gossiper *Gossiper) handleTx(packet *GossiperPacketSender) error {
+	tx, err := packet.packet.Tx.toNormal()
 	if err != nil {
 		return err
 	}
@@ -26,7 +26,7 @@ func (gossiper *Gossiper) handleTransaction(packet *GossiperPacketSender) error 
 	gossiper.errLogger.Println(tx)
 
 	// Verify transaction
-	valid, orphan := gossiper.VerifyTransaction(tx)
+	valid, orphan := gossiper.VerifyTx(tx)
 	if !valid {
 		return errors.New("Error during transaction verification")
 	}
@@ -47,10 +47,10 @@ func (gossiper *Gossiper) handleTransaction(packet *GossiperPacketSender) error 
 	gossiper.updateOrphansTx(tx)
 
 	// Broadcast transaction
-	return gossiper.broadcastTransaction(tx)
+	return gossiper.broadcastTx(tx)
 }
 
-func (gossiper *Gossiper) broadcastTransaction(tx *Transaction) error {
+func (gossiper *Gossiper) broadcastTx(tx *Tx) error {
 	// We must convert to SerializableTx because big.Int is not serializable by protobuf
 	serTx, err := tx.toSerializable()
 	if err != nil {
@@ -58,7 +58,7 @@ func (gossiper *Gossiper) broadcastTransaction(tx *Transaction) error {
 	}
 
 	// Mashall message
-	packet := GossipPacket{Transaction: serTx}
+	packet := GossipPacket{Tx: serTx}
 	buffer, err := protobuf.Encode(&packet)
 	if err != nil {
 		return err

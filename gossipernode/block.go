@@ -20,7 +20,7 @@ type Block struct {
 	Nonce     uint32
 	Target    [32]byte // TODO (maybe): Change into 4 bytes and use difficulty + change it over time
 	PrevHash  [32]byte
-	Txs       []*Transaction
+	Txs       []*Tx
 }
 
 var NilHash = BytesToHash(make([]byte, 32))
@@ -37,7 +37,7 @@ var GenesisBlock = &Block{
 	Nonce:     GenesisNonce,
 	Target:    BytesToHash(InitialTarget),
 	PrevHash:  NilHash,
-	Txs:       make([]*Transaction, 0),
+	Txs:       make([]*Tx, 0),
 }
 
 // See: https://en.bitcoin.it/wiki/Protocol_rules#.22block.22_messages
@@ -112,7 +112,7 @@ func (gossiper *Gossiper) VerifyBlock(block *Block) bool {
 	}
 	gossiper.blockOrphanPoolMutex.Unlock()
 
-	// Transaction list must be non-empty (except for genesisBlock in our case)
+	// Tx list must be non-empty (except for genesisBlock in our case)
 	if !bytes.Equal(NilHash[:], block.PrevHash[:]) && len(block.Txs) == 0 {
 		return false
 	}
@@ -144,7 +144,7 @@ func (gossiper *Gossiper) VerifyBlock(block *Block) bool {
 
 	// Re-verify all transactions (in Bitcoin, only doing 2-4 + verifying MerkleTree)
 	for _, tx := range block.Txs {
-		validTx, _ := gossiper.VerifyTransaction(tx)
+		validTx, _ := gossiper.VerifyTx(tx)
 		if !validTx {
 			return false
 		}
@@ -184,7 +184,7 @@ func (gossiper *Gossiper) removeBlockTxsFromPool(block *Block) {
 	gossiper.txPoolMutex.Lock()
 
 	// Check which tx are in pool but not in given block
-	var filteredPool []*Transaction
+	var filteredPool []*Tx
 	for _, txPool := range gossiper.txPool {
 		inBlock := false
 		for _, txBlock := range block.Txs {
