@@ -482,13 +482,15 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 							gossiper.miningChannel <- true
 
 							// new top means that we may remove some orphan
-							for hash, _ := range gossiper.blockOrphanPool {
+							/*
+								for hash, _ := range gossiper.blockOrphanPool {
 
-								orphanBlock := gossiper.blocks[hash]
-								if gossiper.topBlock-orphanBlock.Height >= DIFF_TO_DELETE_ORPHAN {
+									//orphanBlock := gossiper.blocks[hash]
+									//if gossiper.topBlock. -orphanBlock.Height >= DIFF_TO_DELETE_ORPHAN {
 									// TODO delete from orphan AND blocks
+									//}
 								}
-							}
+							*/
 						}
 						gossiper.topBlockMutex.Unlock()
 
