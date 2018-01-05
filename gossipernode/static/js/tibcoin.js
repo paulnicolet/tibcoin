@@ -78,7 +78,7 @@ function appendBlock(block) {
         }
 
         var offcanvasBar = $('<div>').addClass('uk-offcanvas-bar');
-        offcanvasBar.append($('<button>').addClass('uk-offcanvas-close').attr('uk-close', '').attr('type', 'button'));
+        //offcanvasBar.append($('<button>').addClass('uk-offcanvas-close').attr('uk-close', '').attr('type', 'button'));
         offcanvasBar.append($('<h5>').html('Block transactions'));
         offcanvasBar.append(txDetails);
     
