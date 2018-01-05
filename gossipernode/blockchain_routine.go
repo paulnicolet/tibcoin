@@ -432,14 +432,14 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 						if currentTopBlock.Height < currentTopForkBlock.Height {
 							gossiper.topBlock = currentTopForkHash
 
-							// Warn Miner that he lost the round
-							gossiper.miningChannel <- true
-
 							// Clean the txPool from the tx in the new block
 							// TODO: What happens if we haven't removed the txs from previous blocks
 							// because we changed of fork, or the new top was an orphan? We need to
 							// remove those txs too I think
 							gossiper.removeBlockTxsFromPool(currentTopForkBlock)
+
+							// Warn Miner that he lost the round
+							gossiper.miningChannel <- true
 
 							// TODO optim : new top means that we may remove some orphan
 						}
