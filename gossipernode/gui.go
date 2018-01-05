@@ -32,6 +32,7 @@ func (gossiper *Gossiper) LaunchWebServer() {
 	r.HandleFunc("/matches", gossiper.MatchesHandler).Methods("GET")
 	r.HandleFunc("/blockchain", gossiper.GetBlockchainHandler).Methods("GET")
 	r.HandleFunc("/balance", gossiper.GetBalanceHandler).Methods("GET")
+	r.HandleFunc("/address", gossiper.GetAddressHandler).Methods("GET")
 
 	// Serve static files
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./gossipernode/static/")))
@@ -170,6 +171,18 @@ func (gossiper *Gossiper) GetBalanceHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	m := map[string]interface{}{"balance": balance}
+
+	payload, err := json.Marshal(m)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(payload)
+}
+
+func (gossiper *Gossiper) GetAddressHandler(w http.ResponseWriter, r *http.Request) {
+	m := map[string]interface{}{"address": PublicKeyToAddress(gossiper.publicKey)}
 
 	payload, err := json.Marshal(m)
 	if err != nil {

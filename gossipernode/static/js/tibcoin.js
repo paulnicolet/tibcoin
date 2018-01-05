@@ -13,9 +13,24 @@ $(document).ready(() => {
 		}
     });
 
+    getAddress();
+
     setInterval(updateBlocks, BLOCKS_UPDATE_INTERVAL);
     setInterval(updateBalance, BALANCE_UPDATE_INTERVAL);
 });
+
+function getAddress() {
+    $.ajax({
+		type: "GET",
+		url: "/address",
+    })
+    .fail(function() {
+        console.log('Could not update address')
+    })
+    .done(function(data) {        
+        $('#address').html(JSON.parse(data)["address"])
+	});
+}
 
 function updateBlocks() {
     $.ajax({
