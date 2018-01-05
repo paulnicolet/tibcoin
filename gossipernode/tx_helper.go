@@ -2,11 +2,11 @@ package gossipernode
 
 import (
 	"bytes"
+	"crypto/elliptic"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math/big"
 	"strconv"
 )
 
@@ -98,33 +98,39 @@ func (tx *Tx) size() int {
 }
 
 func (tx *Tx) toSerializable() (*SerializableTx, error) {
-	R, err1 := tx.Sig.R.MarshalJSON()
-	S, err2 := tx.Sig.S.MarshalJSON()
-	X, err3 := tx.PublicKey.X.MarshalJSON()
-	Y, err4 := tx.PublicKey.Y.MarshalJSON()
-	if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
-		return nil, errors.New("Could not serialize R, S, X or Y")
-	}
+	/*
+		R, err1 := tx.Sig.R.MarshalJSON()
+		S, err2 := tx.Sig.S.MarshalJSON()
+		X, err3 := tx.PublicKey.X.MarshalJSON()
+		Y, err4 := tx.PublicKey.Y.MarshalJSON()
+		if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
+			return nil, errors.New("Could not serialize R, S, X or Y")
+		}*/
+
+	elliptic.Marshal(elliptic.P256(), tx.PublicKey.X, tx.PublicKey.Y)
 
 	serTx := &SerializableTx{
 		Inputs:    tx.Inputs,
 		Outputs:   tx.Outputs,
-		Sig:       &SerializedSig{R: R, S: S},
-		PublicKey: &SerializedPublicKey{X: X, Y: Y},
+		Sig:       elliptic.Marshal(elliptic.P256(), tx.PublicKey.X, tx.PublicKey.Y), //&SerializedSig{R: R, S: S},
+		PublicKey: elliptic.Marshal(elliptic.P256(), tx.Sig.R, tx.Sig.S),             //&SerializedPublicKey{X: X, Y: Y},
 	}
 
 	return serTx, nil
 }
 
 func (tx *SerializableTx) toNormal() (*Tx, error) {
-	R, S, X, Y := &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}
+	/*R, S, X, Y := &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}
 	err1 := R.UnmarshalJSON(tx.Sig.R)
 	err2 := S.UnmarshalJSON(tx.Sig.S)
 	err3 := X.UnmarshalJSON(tx.PublicKey.X)
 	err4 := Y.UnmarshalJSON(tx.PublicKey.Y)
 	if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
 		return nil, errors.New("Could not deserialize R, S, X or Y")
-	}
+	}*/
+
+	X, Y := elliptic.Unmarshal(elliptic.P256(), tx.PublicKey)
+	R, S := elliptic.Unmarshal(elliptic.P256(), tx.Sig)
 
 	newTx := &Tx{
 		Inputs:    tx.Inputs,
