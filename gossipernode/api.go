@@ -155,7 +155,7 @@ func (gossiper *Gossiper) shareFile(filename string) error {
 }
 
 func (gossiper *Gossiper) createTx(value int, to string) error {
-	gossiper.errLogger.Printf("Client tx request: %d tibcoins for %s", value, to)
+	gossiper.errLogger.Printf("\nClient tx request: %d tibcoins for %s", value, to)
 	// Generate transaction
 	tx, err := gossiper.NewTx(to, value)
 	if err != nil {
@@ -165,9 +165,7 @@ func (gossiper *Gossiper) createTx(value int, to string) error {
 	gossiper.errLogger.Println(tx)
 
 	// Add to transaction pool
-	gossiper.txPoolMutex.Lock()
-	gossiper.txPool = append(gossiper.txPool, tx)
-	gossiper.txPoolMutex.Unlock()
+	gossiper.addToPool(tx)
 
 	// Broadcast transaction
 	return gossiper.broadcastTx(tx)

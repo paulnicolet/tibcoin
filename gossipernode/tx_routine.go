@@ -22,26 +22,22 @@ func (gossiper *Gossiper) handleTx(packet *GossiperPacketSender) error {
 		return err
 	}
 
-	gossiper.errLogger.Printf("Received new tx from network: %s", packet.from.String())
-	gossiper.errLogger.Println(tx)
+	gossiper.errLogger.Printf("\nReceived new tx %x from network: %s", tx.hash(), packet.from.String())
 
 	// Verify transaction
 	valid, orphan := gossiper.VerifyTx(tx)
 	if !valid {
+		gossiper.errLogger.Printf("\nInvalid tx: reject %x", tx.hash())
 		return errors.New("Error during transaction verification")
 	}
 
 	if orphan {
-		gossiper.orphanTxPoolMutex.Lock()
-		gossiper.orphanTxPool = append(gossiper.orphanTxPool, tx)
-		gossiper.orphanTxPoolMutex.Unlock()
+		gossiper.addToOrphanPool(tx)
 		return nil
 	}
 
 	// Add to transaction pool
-	gossiper.txPoolMutex.Lock()
-	gossiper.txPool = append(gossiper.txPool, tx)
-	gossiper.txPoolMutex.Unlock()
+	gossiper.addToPool(tx)
 
 	// Try to validate some orphans
 	gossiper.updateOrphansTx(tx)
@@ -64,6 +60,7 @@ func (gossiper *Gossiper) broadcastTx(tx *Tx) error {
 		return err
 	}
 
+	gossiper.errLogger.Printf("\nBroadcasting tx to all peers: %x", tx.hash())
 	gossiper.peersMutex.Lock()
 	for _, peer := range gossiper.peers {
 		gossiper.gossipConn.WriteToUDP(buffer, peer.addr)
