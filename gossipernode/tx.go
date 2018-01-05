@@ -1,6 +1,7 @@
 package gossipernode
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -431,6 +432,5 @@ func (gossiper *Gossiper) updateOrphansTx(tx *Transaction) {
 }
 
 func (tx *Transaction) isCoinbaseTx() bool {
-	return len(coinbaseTx.inputs) == 1 && bytes.Equal(coinbaseTx.inputs[0].outputTxHash[:], NilHash[:]) && coinbaseTx.inputs[0].outputIdx == -1
+	return len(tx.Inputs) == 1 && bytes.Equal(tx.Inputs[0].OutputTxHash[:], NilHash[:]) && tx.Inputs[0].OutputIdx == -1
 }
-

@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"sort"
 	"strconv"
 	"time"
 )
@@ -16,12 +15,12 @@ const MaxCoins = 1000000000
 const MaxSecondsBlockInFuture = 2 * 3600 // 2 hours
 
 type Block struct {
-	Timestamp  int64
-	Height     uint32
-	Nonce      uint32
-	Target     [32]byte // TODO (maybe): Change into 4 bytes and use difficulty + change it over time
-	PrevHash   [32]byte
-	Txs        []*Transaction
+	Timestamp int64
+	Height    uint32
+	Nonce     uint32
+	Target    [32]byte // TODO (maybe): Change into 4 bytes and use difficulty + change it over time
+	PrevHash  [32]byte
+	Txs       []*Transaction
 }
 
 var NilHash = BytesToHash(make([]byte, 32))
@@ -38,7 +37,7 @@ var GenesisBlock = &Block{
 	Nonce:     GenesisNonce,
 	Target:    BytesToHash(InitialTarget),
 	PrevHash:  NilHash,
-	Txs:	   make([]*Transaction, 0),
+	Txs:       make([]*Transaction, 0),
 }
 
 // See: https://en.bitcoin.it/wiki/Protocol_rules#.22block.22_messages
@@ -125,7 +124,7 @@ func (gossiper *Gossiper) VerifyBlock(block *Block) bool {
 
 	// Block timestamp must not be more than X seconds in the future (currently 2 hours)
 	// TODO (maybe): might need to change the 2 hours in something more meaningful for us
-	if block.Timestamp > time.Now().Unix() + MaxSecondsBlockInFuture {
+	if block.Timestamp > time.Now().Unix()+MaxSecondsBlockInFuture {
 		return false
 	}
 
@@ -162,7 +161,6 @@ func (gossiper *Gossiper) VerifyBlock(block *Block) bool {
 	// TODO (maybe): might change the number of blocks to check for that (currently 11)
 
 	// TODO rest
-
 
 	return true
 }

@@ -48,10 +48,10 @@ func (gossiper *Gossiper) Mine(channel <-chan bool) (*Block, error) {
 	newTxs[0] = coinbaseTx
 	newTxs = append(newTxs, txs...)
 
-	// Mine until we find a block or we're told to start mining again 
+	// Mine until we find a block or we're told to start mining again
 	var nonce uint32 = 0
 	resetBlock := false
-	
+
 	for {
 		select {
 		case <-channel:
@@ -149,9 +149,9 @@ func (gossiper *Gossiper) computeFees(txs []*Transaction) (int, error) {
 func (gossiper *Gossiper) createCoinbaseTx(fees int) (*Transaction, error) {
 	// 1 special input (hash = nil, idx = -1)
 	inputs := make([]*TxInput, 1)
-	outputs[0] = &TxInput{
-		outputTxHash: NilHash,
-		outputIdx: -1,
+	inputs[0] = &TxInput{
+		OutputTxHash: NilHash,
+		OutputIdx:    -1,
 	}
 
 	// 1 single output being ourselves
