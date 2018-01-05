@@ -11,7 +11,7 @@
 	<script src="js/uikit.min.js"></script>
 	<script src="js/uikit-icons.min.js"></script>
 	<script src="js/script.js"></script>
-	<script src="js/settings.js"></script>
+	<script src="js/tibcoin.js"></script>
 </head>
 
 <body>
@@ -22,8 +22,8 @@
 	            <li><a href="index.html">Public chat</a></li>
 	            <li><a href="private.html">Private messaging</a></li>
                 <li><a href="files.html">File sharing</a></li>
-                <li><a href="tibcoin.html">Tibcoin</a></li>
-	            <li class="uk-active"><a href="settings.html">Settings</a></li>
+                <li class="uk-active"><a href="tibcoin.html">Tibcoin</a></li>
+	            <li><a href="settings.html">Settings</a></li>
 	        </ul>
 	    </div>
 
@@ -33,21 +33,24 @@
 	</nav>
 
 	<div class="uk-container uk-padding-small">
-		<div class="uk-flex uk-flex-center" uk-grid>
-			<div class="uk-width-1-3@m">
-				<form id="name-form">
-					<input class="uk-input" type="text" name="name" id="name" placeholder="Charles-Henri">
-					<button class="uk-button uk-button-default uk-align-center" id="submit-name">Change name</button>
-				</form>
+		<h4>Send tx</h4>
+		<form class="uk-flex-center" id="tx-form" uk-grid>
+			<div class="uk-width-1-2@m">
+				<input class="uk-input" type="text" name="to" id="to-input" placeholder="Cf681uzBj9aHysthA97LZtquQsfm5zZrjrdjh5T9">
 			</div>
+			<div class="uk-width-1-6@m">
+				<input class="uk-input" type="text" name="value" id="value-input" placeholder="200">
+			</div>
+			<div class="uk-width-1-6@m">
+				<button class="uk-button uk-button-default" id="send-tx">Send</button>
+			</div>
+		</form>
 
-			<div class="uk-width-1-3@m">
-				<form id="peer-form">
-					<input class="uk-input" type="text" name="peer" id="peer" placeholder="1.1.1.1:3000">
-					<button class="uk-button uk-button-default uk-align-center" id="submit-peer">Add peer</button>
-				</form>
-			</div>
-		</div>
+		<h4>Blockchain explorer</h4>
+		<ul class="uk-list uk-list-divider" id="blocks-list">
+		</ul>
+
+		<div id="offcanvas-container"></div>
 	</div>
 
 </body>

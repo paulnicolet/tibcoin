@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -20,6 +21,7 @@ func (gossiper *Gossiper) LaunchWebServer() {
 	r.HandleFunc("/share-file", gossiper.NewFilerHandler).Methods("POST")
 	r.HandleFunc("/search", gossiper.NewSearchHandler).Methods("POST")
 	r.HandleFunc("/download", gossiper.NewDownloadHandler).Methods("POST")
+	r.HandleFunc("/tx", gossiper.NewTxHandler).Methods("POST")
 
 	// GET
 	r.HandleFunc("/chat", gossiper.ChatHandler).Methods("GET")
@@ -28,6 +30,7 @@ func (gossiper *Gossiper) LaunchWebServer() {
 	r.HandleFunc("/destinations", gossiper.DestinationsHandler).Methods("GET")
 	r.HandleFunc("/private-chat", gossiper.PrivateChatHandler).Methods("GET")
 	r.HandleFunc("/matches", gossiper.MatchesHandler).Methods("GET")
+	r.HandleFunc("/blockchain", gossiper.GetBlockchainHandler).Methods("GET")
 
 	// Serve static files
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./gossipernode/static/")))
@@ -143,6 +146,19 @@ func (gossiper *Gossiper) PrivateChatHandler(w http.ResponseWriter, r *http.Requ
 	w.Write(payload)
 }
 
+func (gossiper *Gossiper) GetBlockchainHandler(w http.ResponseWriter, r *http.Request) {
+	blocks := gossiper.getBlockchain()
+	m := map[string]interface{}{"blocks": blocks}
+
+	payload, err := json.Marshal(m)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(payload)
+}
+
 // --------------------------------- Inputs --------------------------------- //
 func (gossiper *Gossiper) NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 	// Get input
@@ -240,4 +256,28 @@ func (gossiper *Gossiper) NewDownloadHandler(w http.ResponseWriter, r *http.Requ
 
 	gossiper.downloadFile(filename)
 	w.WriteHeader(http.StatusOK)
+}
+
+func (gossiper *Gossiper) NewTxHandler(w http.ResponseWriter, r *http.Request) {
+	// Get input
+	value := r.FormValue("value")
+	gossiper.errLogger.Println(value)
+	valueInt, err := strconv.Atoi(value)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	to := r.FormValue("to")
+	if to == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	err = gossiper.createTransaction(valueInt, to)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
 }

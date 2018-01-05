@@ -1,6 +1,7 @@
 package gossipernode
 
 import (
+	"encoding/hex"
 	"net"
 	"time"
 )
@@ -170,4 +171,56 @@ func (gossiper *Gossiper) createTransaction(value int, to string) error {
 
 	// Broadcast transaction
 	return gossiper.broadcastTransaction(tx)
+}
+
+type BlockWithHash struct {
+	Hash      string
+	Timestamp string
+	Height    uint32
+	Nonce     uint32
+	PrevHash  string
+	Txs       []*TxWithHash
+}
+
+type TxWithHash struct {
+	Tx      *Transaction
+	Hash    string
+	Address string
+}
+
+func (gossiper *Gossiper) getBlockchain() []*BlockWithHash {
+	gossiper.topBlockMutex.Lock()
+	topBlockHash := gossiper.topBlock
+	gossiper.topBlockMutex.Unlock()
+
+	var blocks []*BlockWithHash
+
+	gossiper.blocksMutex.Lock()
+	currentBlock, hasNextBlock := gossiper.blocks[topBlockHash]
+	for hasNextBlock {
+		// Transform txs
+		var txs []*TxWithHash
+		for _, tx := range currentBlock.Txs {
+			txHash := tx.hash()
+			txs = append(txs, &TxWithHash{
+				Tx:      tx,
+				Hash:    hex.EncodeToString(txHash[:]),
+				Address: PublicKeyToAddress(tx.PublicKey),
+			})
+		}
+
+		currentHash := currentBlock.hash()
+		blocks = append(blocks, &BlockWithHash{
+			Timestamp: time.Unix(currentBlock.Timestamp, 0).String(),
+			Hash:      hex.EncodeToString(currentHash[:]),
+			Height:    currentBlock.Height,
+			Nonce:     currentBlock.Nonce,
+			PrevHash:  hex.EncodeToString(currentBlock.PrevHash[:]),
+			Txs:       txs,
+		})
+		currentBlock, hasNextBlock = gossiper.blocks[currentBlock.PrevHash]
+	}
+	gossiper.blocksMutex.Unlock()
+
+	return blocks
 }
