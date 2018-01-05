@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"math/rand"
 	"net"
 	"time"
 
@@ -157,9 +158,23 @@ func (gossiper *Gossiper) requestBlock(blockHash [32]byte) {
 		} else {
 
 			gossiper.blockInRequestMutex.Lock()
+			gossiper.peerNumRequestMutex.Lock()
 			l := gossiper.blockInRequest[blockHash]
 
-			currentRequestedPeer = l[0] // TODO optim: choose randomly
+			randomIdx := rand.Intn(len(l))
+			currentIdx := randomIdx
+
+			var currentRequestedPeer *net.UDPAddr
+			currentRequestedPeer = nil
+
+			for currentRequestedPeer != nil && (currentIdx+1)%len(l) != randomIdx {
+				currentRequestedPeer = l[currentIdx%len(l)]
+				if gossiper.peerNumRequest[currentRequestedPeer] < REQUEST_BLOCK_WAIT {
+					currentRequestedPeer = nil
+				}
+				currentIdx++
+			}
+			gossiper.peerNumRequestMutex.Unlock()
 			gossiper.blockInRequestMutex.Unlock()
 
 			// if any peer is available, send the request
@@ -374,7 +389,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 			// check if we don't already have the block
 			if !ok {
 
-				// TODO verfiy block
+				// verfiy block
 				verify := gossiper.VerifyBlock(block)
 				if verify {
 
@@ -483,16 +498,14 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 							// Warn Miner that he lost the round
 							gossiper.miningChannel <- true
 
-							/*
-								// new top means that we may remove some orphan
-								for hash, _ := range gossiper.blockOrphanPool {
-									orphanBlock := gossiper.blocks[hash]
-									if currentTopBlock.Height-orphanBlock.Height >= DIFF_TO_DELETE_ORPHAN {
-										delete(gossiper.blocks, hash)
-										delete(gossiper.blockOrphanPool, hash)
-									}
+							// new top means that we may remove some orphan
+							for hash, _ := range gossiper.blockOrphanPool {
+								orphanBlock := gossiper.blocks[hash]
+								if currentTopBlock.Height-orphanBlock.Height >= DIFF_TO_DELETE_ORPHAN {
+									delete(gossiper.blocks, hash)
+									delete(gossiper.blockOrphanPool, hash)
 								}
-							*/
+							}
 						}
 						gossiper.topBlockMutex.Unlock()
 
