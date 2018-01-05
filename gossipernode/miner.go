@@ -128,15 +128,21 @@ func (gossiper *Gossiper) Mine() (*Block, error) {
 			// Filter txPool
 			gossiper.removeBlockTxsFromPool(block)
 
-			// Broadcast to peers
-			gossiper.peersMutex.Lock()
-			for _, peer := range gossiper.peers {
-				sendErr := gossiper.sendBlockTo(block, peer.addr)
-				if sendErr != nil {
-					gossiper.errLogger.Printf("Error sending mined block (hash = %x): %v\n", blockHash[:], sendErr)
+			// Verify block
+			if gossiper.VerifyBlock(block) {
+				gossiper.errLogger.Println("Valid mined block")
+				// Broadcast to peers
+				gossiper.peersMutex.Lock()
+				for _, peer := range gossiper.peers {
+					sendErr := gossiper.sendBlockTo(block, peer.addr)
+					if sendErr != nil {
+						gossiper.errLogger.Printf("Error sending mined block (hash = %x): %v\n", blockHash[:], sendErr)
+					}
 				}
+				gossiper.peersMutex.Unlock()
+			} else {
+				gossiper.errLogger.Println("Invalid mined block")
 			}
-			gossiper.peersMutex.Unlock()
 
 			resetBlock = true
 		} else {

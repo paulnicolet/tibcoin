@@ -3,7 +3,6 @@ package gossipernode
 import (
 	"bytes"
 	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/rand"
 	"errors"
 	"math"
@@ -308,7 +307,6 @@ func (gossiper *Gossiper) checkSig(tx *Tx) bool {
 		ecdsaPublicKey := &ecdsa.PublicKey{
 			X:     tx.PublicKey.X,
 			Y:     tx.PublicKey.Y,
-			Curve: elliptic.P256(),
 		}
 		if !ecdsa.Verify(ecdsaPublicKey, signable[:], tx.Sig.R, tx.Sig.S) {
 			return false
