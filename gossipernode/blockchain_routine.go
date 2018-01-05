@@ -350,6 +350,8 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 	reply := blockReplyPacket.packet.BlockReply
 	from := blockReplyPacket.from
 
+	//gossiper.errLogger.Printf("***********************")
+
 	// check if we got a block or inventory
 	// first the block
 	if reply.Block != nil {

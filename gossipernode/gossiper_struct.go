@@ -219,6 +219,8 @@ func (gossiper *Gossiper) Start() error {
 	go gossiper.DataReplyRoutine(dataReplyChannel)
 	go gossiper.SearchRequestRoutine(searchRequestChannel)
 	go gossiper.SearchReplyRoutine(searchReplyChannel)
+	go gossiper.blockRequestRoutine(blockRequestChannel)
+	go gossiper.blockReplyRoutine(blockReplyChannel)
 	go gossiper.TxRoutine(transactionChannel)
 
 	// Spawn anti-antropy
@@ -236,33 +238,33 @@ func (gossiper *Gossiper) Start() error {
 	// TODO: remove
 
 	/*
-	// Create new block + hash
-	block := GenesisBlock
-	target := block.Target
-	var nonce uint32 = 0
+		// Create new block + hash
+		block := GenesisBlock
+		target := block.Target
+		var nonce uint32 = 0
 
-	for {
-		blockHash := block.hash()
+		for {
+			blockHash := block.hash()
 
-		// See if found new valid block
-		if bytes.Compare(blockHash[:], target[:]) < 0 {
-			// Found block!
-			fmt.Printf("[GENESIS] Found new block: %x with nonce = %d.\n", blockHash[:], nonce)
-			break
+			// See if found new valid block
+			if bytes.Compare(blockHash[:], target[:]) < 0 {
+				// Found block!
+				fmt.Printf("[GENESIS] Found new block: %x with nonce = %d.\n", blockHash[:], nonce)
+				break
+			}
+
+			nonce++
+
+			block = &Block{
+				Timestamp: time.Date(2018, 1, 3, 11, 00, 00, 00, time.UTC).Unix(),
+				Height:    0,
+				Nonce:     nonce,
+				Target:    BytesToHash(InitialTarget),
+				PrevHash:  NilHash,
+				Txs:       make([]*Transaction, 0),
+			}
+
 		}
-
-		nonce++
-
-		block = &Block{
-			Timestamp: time.Date(2018, 1, 3, 11, 00, 00, 00, time.UTC).Unix(),
-			Height:    0,
-			Nonce:     nonce,
-			Target:    BytesToHash(InitialTarget),
-			PrevHash:  NilHash,
-			Txs:       make([]*Transaction, 0),
-		}
-
-	}
 	*/
 
 	// TODO: Do this to start mining. Should we only start when we are up to date and have all the blocks?
