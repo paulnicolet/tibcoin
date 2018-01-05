@@ -23,6 +23,15 @@ type Block struct {
 	Txs       []*Tx
 }
 
+type SerializableBlock struct {
+	Timestamp int64
+	Height    uint32
+	Nonce     uint32
+	Target    [32]byte
+	PrevHash  [32]byte
+	Txs       []*SerializableTx
+}
+
 var NilHash = BytesToHash(make([]byte, 32))
 
 var InitialTarget, _ = hex.DecodeString("00000F0000000000000000000000000000000000000000000000000000000000")
@@ -167,21 +176,6 @@ func (gossiper *Gossiper) VerifyBlock(block *Block) bool {
 	return true
 }
 
-func (block *Block) hash() [32]byte {
-	hash := sha256.New()
-	hash.Write([]byte(fmt.Sprintf("%v", block.Timestamp)))
-	hash.Write([]byte(strconv.Itoa(int(block.Height))))
-	hash.Write([]byte(strconv.Itoa(int(block.Nonce))))
-	hash.Write(block.PrevHash[:])
-
-	for _, tx := range block.Txs {
-		txHash := tx.hash()
-		hash.Write(txHash[:])
-	}
-
-	return BytesToHash(hash.Sum(nil))
-}
-
 func (gossiper *Gossiper) removeBlockTxsFromPool(block *Block) {
 	gossiper.txPoolMutex.Lock()
 
@@ -209,4 +203,63 @@ func (gossiper *Gossiper) removeBlockTxsFromPool(block *Block) {
 	gossiper.txPool = filteredPool
 
 	gossiper.txPoolMutex.Unlock()
+}
+
+func (block *Block) hash() [32]byte {
+	hash := sha256.New()
+	hash.Write([]byte(fmt.Sprintf("%v", block.Timestamp)))
+	hash.Write([]byte(strconv.Itoa(int(block.Height))))
+	hash.Write([]byte(strconv.Itoa(int(block.Nonce))))
+	hash.Write(block.PrevHash[:])
+
+	for _, tx := range block.Txs {
+		txHash := tx.hash()
+		hash.Write(txHash[:])
+	}
+
+	return BytesToHash(hash.Sum(nil))
+}
+
+func (block *Block) toSerializable() (*SerializableBlock, error) {
+	var serTxs []*SerializableTx
+
+	for _, tx := range block.Txs {
+		serTx, err := tx.toSerializable()
+		if err != nil {
+			return nil, err
+		}
+
+		serTxs = append(serTxs, serTx)
+	}
+
+	return &SerializableBlock{
+		Timestamp: block.Timestamp,
+		Height:    block.Height,
+		Nonce:     block.Nonce,
+		Target:    block.Target,
+		PrevHash:  block.PrevHash,
+		Txs:       serTxs,
+	}, nil
+}
+
+func (block *SerializableBlock) toNormal() (*Block, error) {
+	var txs []*Tx
+
+	for _, serTx := range block.Txs {
+		tx, err := serTx.toNormal()
+		if err != nil {
+			return nil, err
+		}
+
+		txs = append(txs, tx)
+	}
+
+	return &Block{
+		Timestamp: block.Timestamp,
+		Height:    block.Height,
+		Nonce:     block.Nonce,
+		Target:    block.Target,
+		PrevHash:  block.PrevHash,
+		Txs:       txs,
+	}, nil
 }

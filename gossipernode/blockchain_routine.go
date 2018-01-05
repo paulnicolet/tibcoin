@@ -309,16 +309,21 @@ func (gossiper *Gossiper) handleBlockRequest(blockRequestPacket *GossiperPacketS
 }
 
 func (gossiper *Gossiper) sendBlockTo(block *Block, to *net.UDPAddr) error {
+	serBlock, err := block.toSerializable()
+	if err != nil {
+		return err
+	}
 	packet := &GossipPacket{
 		BlockReply: &BlockReply{
 			Origin: gossiper.name,
 			Hash:   block.hash(),
-			Block:  block,
+			Block:  serBlock,
 		},
 	}
 
 	buffer, err := protobuf.Encode(&packet)
 	if err != nil {
+		gossiper.errLogger.Println(err)
 		return err
 	}
 
@@ -350,7 +355,12 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 	if reply.Block != nil {
 
 		// check that the block wasn't corrupted by UDP
-		tmp := reply.Block.hash()
+		block, err := reply.Block.toNormal()
+		if err != nil {
+			return err
+		}
+
+		tmp := block.hash()
 		corrupted := !bytes.Equal(tmp[:], reply.Hash[:])
 
 		if !corrupted {
@@ -363,7 +373,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 			if !ok {
 
 				// TODO verfiy block
-				verify := gossiper.VerifyBlock(reply.Block)
+				verify := gossiper.VerifyBlock(block)
 				if verify {
 
 					loggerMsg := fmt.Sprintf("[bc_route]: valid block %x received.", reply.Hash[:])
@@ -378,7 +388,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 					if !ok {
 						gossiper.peersMutex.Lock()
 						for _, peer := range gossiper.peers {
-							gossiper.sendBlockTo(reply.Block, peer.addr)
+							gossiper.sendBlockTo(block, peer.addr)
 						}
 						gossiper.peersMutex.Unlock()
 
@@ -393,7 +403,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 					gossiper.blockOrphanPoolMutex.Lock()
 
 					// add the block to the big block map
-					gossiper.blocks[reply.Hash] = reply.Block
+					gossiper.blocks[reply.Hash] = block
 
 					// see if we can add this block to one of the top fork
 					found := false
@@ -419,7 +429,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 
 						// fixed point needed to move on we had the possibility to put the new block at the top of the updated fork
 						currentTopForkHash := reply.Hash
-						currentTopForkBlock := reply.Block
+						currentTopForkBlock := block
 						done := false
 						for !done {
 

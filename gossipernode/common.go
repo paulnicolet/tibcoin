@@ -86,7 +86,7 @@ type BlockRequest struct {
 type BlockReply struct {
 	Origin     string
 	Hash       [32]byte
-	Block      *Block
+	Block      *SerializableBlock
 	BlocksHash [][32]byte
 }
 
