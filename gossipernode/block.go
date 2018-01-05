@@ -76,32 +76,7 @@ func (gossiper *Gossiper) VerifyBlock(block *Block) bool {
 	// TODO: really needed? it seems already done before calling that by checking in 'blocks'
 	// Reject if duplicate of block in main branch
 	/*
-	currentBlock := prevBlock
-	for blockExists {
-		currentHash := currentBlock.hash()
-		if bytes.Equal(currentHash[:], blockHash[:]) {
-			return false
-		}
-
-		// Get the previous block
-		gossiper.blocksMutex.Lock()
-		currentBlock, blockExists = gossiper.blocks[currentBlock.PrevHash]
-		gossiper.blocksMutex.Unlock()
-	}
-
-	// Reject if duplicate of block in one of the forks
-	gossiper.forksMutex.Lock()
-	for topForkHash, _ := range gossiper.forks {
-		// Get current top fork block
-		gossiper.blocksMutex.Lock()
-		currentBlock, blockExists = gossiper.blocks[topForkHash]
-		gossiper.blocksMutex.Unlock()
-
-		// If we couldn't find the top fork block, we are in a wrong state, we should panic
-		if !blockExists {
-			panic(errors.New(fmt.Sprintf("Cannot find top fork block (hash = %x).", topForkHash[:])))
-		}
-
+		currentBlock := prevBlock
 		for blockExists {
 			currentHash := currentBlock.hash()
 			if bytes.Equal(currentHash[:], blockHash[:]) {
@@ -113,17 +88,42 @@ func (gossiper *Gossiper) VerifyBlock(block *Block) bool {
 			currentBlock, blockExists = gossiper.blocks[currentBlock.PrevHash]
 			gossiper.blocksMutex.Unlock()
 		}
-	}
-	gossiper.forksMutex.Unlock()
 
-	// Reject if duplicate of block in orpans
-	gossiper.blockOrphanPoolMutex.Lock()
-	for orphanHash, _ := range gossiper.blockOrphanPool {
-		if bytes.Equal(orphanHash[:], blockHash[:]) {
-			return false
+		// Reject if duplicate of block in one of the forks
+		gossiper.forksMutex.Lock()
+		for topForkHash, _ := range gossiper.forks {
+			// Get current top fork block
+			gossiper.blocksMutex.Lock()
+			currentBlock, blockExists = gossiper.blocks[topForkHash]
+			gossiper.blocksMutex.Unlock()
+
+			// If we couldn't find the top fork block, we are in a wrong state, we should panic
+			if !blockExists {
+				panic(errors.New(fmt.Sprintf("Cannot find top fork block (hash = %x).", topForkHash[:])))
+			}
+
+			for blockExists {
+				currentHash := currentBlock.hash()
+				if bytes.Equal(currentHash[:], blockHash[:]) {
+					return false
+				}
+
+				// Get the previous block
+				gossiper.blocksMutex.Lock()
+				currentBlock, blockExists = gossiper.blocks[currentBlock.PrevHash]
+				gossiper.blocksMutex.Unlock()
+			}
 		}
-	}
-	gossiper.blockOrphanPoolMutex.Unlock()
+		gossiper.forksMutex.Unlock()
+
+		// Reject if duplicate of block in orpans
+		gossiper.blockOrphanPoolMutex.Lock()
+		for orphanHash, _ := range gossiper.blockOrphanPool {
+			if bytes.Equal(orphanHash[:], blockHash[:]) {
+				return false
+			}
+		}
+		gossiper.blockOrphanPoolMutex.Unlock()
 	*/
 
 	// Tx list must be non-empty (except for genesisBlock in our case)

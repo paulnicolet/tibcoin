@@ -156,6 +156,11 @@ func (gossiper *Gossiper) VerifyTx(tx *Tx) (bool, bool) {
 	}
 	gossiper.txPoolMutex.Unlock()
 
+	// Cut short if coinbase tx
+	if tx.isCoinbaseTx() {
+		return gossiper.checkSig(tx), false
+	}
+
 	// Look for corresponding UTXOs in main branch and tx pool
 	inputSum := 0
 	var outputs []*TxOutputLocation
