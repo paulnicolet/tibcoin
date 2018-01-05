@@ -363,7 +363,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 			if !ok {
 
 				// TODO verfiy block
-				verify := true
+				verify := gossiper.VerifyBlock(reply.Block)
 				if verify {
 
 					loggerMsg := fmt.Sprintf("[bc_route]: valid block %x received.", reply.Hash[:])
@@ -491,6 +491,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 
 					return nil
 				} else {
+					gossiper.errLogger.Printf("Block NOT correct: %x\n", reply.Hash[:])
 					return errors.New("Block wrong at verification step")
 				}
 			} else {

@@ -29,7 +29,7 @@ var InitialTarget, _ = hex.DecodeString("00000F000000000000000000000000000000000
 
 // Nonce found in order to have a genesis block respecting initial target; should be recomputed
 // if anything about the genesis block is changed
-var GenesisNonce uint32 = 538368
+var GenesisNonce uint32 = 538367
 
 var GenesisBlock = &Block{
 	Timestamp: time.Date(2018, 1, 3, 11, 00, 00, 00, time.UTC).Unix(),
@@ -44,6 +44,8 @@ var GenesisBlock = &Block{
 func (gossiper *Gossiper) VerifyBlock(block *Block) bool {
 	// Get the hash of the given block
 	blockHash := block.hash()
+
+	gossiper.errLogger.Printf("Verifying block: %x\n", blockHash)
 
 	// Get current top hash
 	gossiper.topBlockMutex.Lock()
@@ -197,6 +199,9 @@ func (gossiper *Gossiper) removeBlockTxsFromPool(block *Block) {
 		// Only keep if not in block
 		if !inBlock {
 			filteredPool = append(filteredPool, txPool)
+		} else {
+			txHash := txPool.hash()
+			gossiper.errLogger.Printf("Removed tx: %x\n", txHash[:])
 		}
 	}
 

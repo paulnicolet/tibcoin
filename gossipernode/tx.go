@@ -244,7 +244,10 @@ func (gossiper *Gossiper) computeTxFee(tx *Tx) (int, error) {
 	}
 
 	// Fee is the difference
-	return inputsCash - outputsCash, nil
+	fee := inputsCash - outputsCash
+	txHash := tx.hash()
+	gossiper.errLogger.Printf("Fee for tx (hash = %x): %d\n", txHash[:], fee)
+	return fee, nil
 }
 
 func (gossiper *Gossiper) signTx(tx *Tx) (*Tx, error) {
