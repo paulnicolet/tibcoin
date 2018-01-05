@@ -293,26 +293,28 @@ func (gossiper *Gossiper) checkSig(tx *Tx) bool {
 	address := PublicKeyToAddress(tx.PublicKey)
 	signable := tx.getSignable()
 
-	for _, input := range tx.Inputs {
-		output, err := gossiper.getOutput(input)
-		if err != nil {
-			return false
-		}
+	if !tx.isCoinbaseTx() {
+		for _, input := range tx.Inputs {
+			output, err := gossiper.getOutput(input)
+			if err != nil {
+				return false
+			}
 
-		// Check receiver address
-		if !(output.To == address) {
-			return false
+			// Check receiver address
+			if !(output.To == address) {
+				return false
+			}
 		}
+	}
 
-		// Check signature
-		ecdsaPublicKey := &ecdsa.PublicKey{
-			X:     tx.PublicKey.X,
-			Y:     tx.PublicKey.Y,
-			Curve: elliptic.P256(),
-		}
-		if !ecdsa.Verify(ecdsaPublicKey, signable[:], tx.Sig.R, tx.Sig.S) {
-			return false
-		}
+	// Check signature
+	ecdsaPublicKey := &ecdsa.PublicKey{
+		X:     tx.PublicKey.X,
+		Y:     tx.PublicKey.Y,
+		Curve: elliptic.P256(),
+	}
+	if !ecdsa.Verify(ecdsaPublicKey, signable[:], tx.Sig.R, tx.Sig.S) {
+		return false
 	}
 
 	return true
