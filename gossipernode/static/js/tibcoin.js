@@ -45,7 +45,12 @@ function appendBlock(block) {
     body.append($('<li>').html('Height: ' + block.Height).addClass('uk-text-meta'));
     body.append($('<li>').html('Nonce: ' + block.Nonce).addClass('uk-text-meta'));
     body.append($('<li>').html('Previous block: ' + block.PrevHash).addClass('uk-text-meta'));
-    body.append($('<li>').html('# of tx: ' + block.Txs.length).addClass('uk-text-meta'));
+
+    var txNb = 0
+    if (block.Txs != null) {
+        txNb = block.Txs.length
+    }
+    body.append($('<li>').html('# of tx: ' + txNb).addClass('uk-text-meta'));
 
     var elem = $('<li>');
     elem.append(title);
@@ -55,19 +60,21 @@ function appendBlock(block) {
     if($('#' + block.Hash).length == 0) {
         // Append canvas if does not exists yet
         var txDetails = $('<ul>').addClass('uk-list uk-list-divider');
-        block.Txs.forEach(tx => {
-            var txContent = $('<li>');
-            txContent.append($('<div>').html('<span class="uk-text-success">From:</span> ' + tx.Address).addClass('uk-text-meta'));
-            txContent.append($('<div>').html('<span class="uk-text-success">Hash:</span> ' + tx.Hash).addClass('uk-text-meta'));
-            txContent.append($('<div>').html('Outputs').addClass('uk-text-meta uk-text-success'));
-            var outputs = $('<ul>').addClass('uk-list');
-            tx.Tx.Outputs.forEach(output => {
-                outputs.append($('<li>').html(output.Value + ' tibcoins to ' + output.To).addClass('uk-text-meta'));
+        if (block.Txs != null) {
+            block.Txs.forEach(tx => {
+                var txContent = $('<li>');
+                txContent.append($('<div>').html('<span class="uk-text-success">From:</span> ' + tx.Address).addClass('uk-text-meta'));
+                txContent.append($('<div>').html('<span class="uk-text-success">Hash:</span> ' + tx.Hash).addClass('uk-text-meta'));
+                txContent.append($('<div>').html('Outputs').addClass('uk-text-meta uk-text-success'));
+                var outputs = $('<ul>').addClass('uk-list');
+                tx.Tx.Outputs.forEach(output => {
+                    outputs.append($('<li>').html(output.Value + ' tibcoins to ' + output.To).addClass('uk-text-meta'));
+                });
+    
+                txContent.append(outputs);
+                txDetails.append(txContent);
             });
-
-            txContent.append(outputs);
-            txDetails.append(txContent);
-        });
+        }
 
         var offcanvasBar = $('<div>').addClass('uk-offcanvas-bar');
         offcanvasBar.append($('<button>').addClass('uk-offcanvas-close').attr('uk-close', '').attr('type', 'button'));
