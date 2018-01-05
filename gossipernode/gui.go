@@ -274,7 +274,7 @@ func (gossiper *Gossiper) NewTxHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = gossiper.createTransaction(valueInt, to)
+	err = gossiper.createTx(valueInt, to)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 	} else {

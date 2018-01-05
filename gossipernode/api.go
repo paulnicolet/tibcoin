@@ -154,10 +154,10 @@ func (gossiper *Gossiper) shareFile(filename string) error {
 	return nil
 }
 
-func (gossiper *Gossiper) createTransaction(value int, to string) error {
-	gossiper.errLogger.Printf("Client tx request: %d tibcoins for %s", value, to)
+func (gossiper *Gossiper) createTx(value int, to string) error {
+	gossiper.errLogger.Printf("\nClient tx request: %d tibcoins for %s", value, to)
 	// Generate transaction
-	tx, err := gossiper.NewTransaction(to, value)
+	tx, err := gossiper.NewTx(to, value)
 	if err != nil {
 		return err
 	}
@@ -165,12 +165,10 @@ func (gossiper *Gossiper) createTransaction(value int, to string) error {
 	gossiper.errLogger.Println(tx)
 
 	// Add to transaction pool
-	gossiper.txPoolMutex.Lock()
-	gossiper.txPool = append(gossiper.txPool, tx)
-	gossiper.txPoolMutex.Unlock()
+	gossiper.addToPool(tx)
 
 	// Broadcast transaction
-	return gossiper.broadcastTransaction(tx)
+	return gossiper.broadcastTx(tx)
 }
 
 type BlockWithHash struct {
@@ -184,7 +182,7 @@ type BlockWithHash struct {
 }
 
 type TxWithHash struct {
-	Tx      *Transaction
+	Tx      *Tx
 	Hash    string
 	Address string
 }

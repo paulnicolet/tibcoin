@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"net"
 	"time"
 
@@ -41,6 +42,8 @@ func (gossiper *Gossiper) getInventory() {
 				gossiper.errLogger.Printf("Error in getInventory: %v", err)
 			}
 		}
+
+		gossiper.errLogger.Printf("[bc_rout]: request inventory from neighboor(s)")
 	}
 }
 
@@ -55,6 +58,8 @@ func addrInList(l []*net.UDPAddr, e *net.UDPAddr) bool {
 }
 
 func (gossiper *Gossiper) requestBlocksFromInventory(inventory [][32]byte, from *net.UDPAddr) {
+
+	gossiper.errLogger.Printf("[bc_rout]: requested block(s) from inventory of %s", from.String())
 
 	for _, hash := range inventory {
 
@@ -98,6 +103,8 @@ func (gossiper *Gossiper) requestBlocksFromInventory(inventory [][32]byte, from 
 			// we create the requester if needed
 			if !containsOngoingRequest {
 				go gossiper.requestBlock(hash)
+
+				gossiper.errLogger.Printf("[bc_rout]: created requester for block %x", hash[:])
 			}
 		}
 	}
@@ -167,6 +174,12 @@ func (gossiper *Gossiper) requestBlock(blockHash [32]byte) {
 				}
 			}
 		}
+
+		requestedName := "_nobody_"
+		if currentRequestedPeer != nil {
+			requestedName = currentRequestedPeer.String()
+		}
+		gossiper.errLogger.Printf("[bc_rout]: requester request block %x to %s", blockHash[:], requestedName)
 	}
 }
 
@@ -183,6 +196,7 @@ func (gossiper *Gossiper) blockRequestRoutine(channel <-chan *GossiperPacketSend
 func (gossiper *Gossiper) handleBlockRequest(blockRequestPacket *GossiperPacketSender) error {
 
 	request := blockRequestPacket.packet.BlockRequest
+	from := blockRequestPacket.from
 
 	// if it is an inventory
 	if request.WaitingInv {
@@ -237,6 +251,8 @@ func (gossiper *Gossiper) handleBlockRequest(blockRequestPacket *GossiperPacketS
 					concatHash = append(concatHash, blocksHash[i][:]...)
 				}
 
+				gossiper.errLogger.Printf("[bc_rout]: valid requested inventory from %s, size send = %d", from.String(), counter)
+
 				// we are ready to send the inventory
 				packet := &GossipPacket{
 					BlockReply: &BlockReply{
@@ -277,6 +293,8 @@ func (gossiper *Gossiper) handleBlockRequest(blockRequestPacket *GossiperPacketS
 			// then check if we know the origin
 			to, containsOrigin := gossiper.peers[request.Origin]
 			if containsOrigin {
+				gossiper.errLogger.Printf("[bc_rout]: valid requested block %x, from %s", request.BlockHash[:], from.String())
+
 				return gossiper.sendBlockTo(block, to.addr)
 			} else {
 				return errors.New("Unknown origin")
@@ -305,6 +323,10 @@ func (gossiper *Gossiper) sendBlockTo(block *Block, to *net.UDPAddr) error {
 	}
 
 	_, err = gossiper.gossipConn.WriteToUDP(buffer, to)
+
+	tmp := block.hash()
+	gossiper.errLogger.Printf("[bc_rout]: block %x sent to %s", tmp[:], to.String())
+
 	return err
 }
 
@@ -344,7 +366,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 				verify := gossiper.VerifyBlock(reply.Block)
 				if verify {
 
-					gossiper.errLogger.Printf("Block verified: %x\n", reply.Hash[:])
+					loggerMsg := fmt.Sprintf("[bc_route]: valid block %x received.", reply.Hash[:])
 
 					// check if we are expecting this block
 					gossiper.blockInRequestMutex.Lock()
@@ -359,6 +381,10 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 							gossiper.sendBlockTo(reply.Block, peer.addr)
 						}
 						gossiper.peersMutex.Unlock()
+
+						loggerMsg += " It's a recently mined block."
+					} else {
+						loggerMsg += " It's a requested block."
 					}
 
 					// TODO otpim : check for finer grain lock
@@ -381,8 +407,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 
 					if found {
 
-						// add the new height
-						reply.Block.Height = gossiper.blocks[toRemove].Height + 1
+						loggerMsg = fmt.Sprintf(loggerMsg+" It's put at the top of %x", toRemove[:])
 
 						// replace fork top
 						gossiper.forks[reply.Hash] = true
@@ -408,8 +433,6 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 
 									newBlockTop := gossiper.blocks[hash]
 
-									// add the new height
-									newBlockTop.Height = currentTopForkBlock.Height + 1
 									currentTopForkBlock = newBlockTop
 
 									// replace fork top
@@ -424,6 +447,8 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 							// remove from orphan if needed
 							if !done {
 								delete(gossiper.blockOrphanPool, currentTopForkHash)
+
+								loggerMsg = fmt.Sprintf(loggerMsg+" Orphan %x is now top of the fork.", currentTopForkHash[:])
 							}
 
 						}
@@ -432,6 +457,9 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 						gossiper.topBlockMutex.Lock()
 						currentTopBlock := gossiper.blocks[gossiper.topBlock]
 						if currentTopBlock.Height < currentTopForkBlock.Height {
+
+							loggerMsg += " It's the new longest blockchain."
+
 							gossiper.topBlock = currentTopForkHash
 
 							// Clean the txPool from the tx in the new block
@@ -451,15 +479,19 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 
 						// can't find a place to put it, it's an orphan
 						gossiper.blockOrphanPool[reply.Hash] = reply.Block.PrevHash
+
+						loggerMsg += " It's put in the orphan pool."
 					}
 
 					gossiper.blockOrphanPoolMutex.Unlock()
 					gossiper.forksMutex.Unlock()
 					gossiper.blocksMutex.Unlock()
 
+					gossiper.errLogger.Printf(loggerMsg)
+
 					return nil
 				} else {
-					gossiper.errLogger.Printf("Block NOT verified: %x\n", reply.Hash[:])
+					gossiper.errLogger.Printf("Block NOT correct: %x\n", reply.Hash[:])
 					return errors.New("Block wrong at verification step")
 				}
 			} else {
@@ -484,6 +516,8 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 		// if not corrupted request for all elements in inventory
 		if !corrupted {
 			go gossiper.requestBlocksFromInventory(reply.BlocksHash, from)
+
+			gossiper.errLogger.Printf("[bc_rout]: valid inventory in reply from %s", from.String())
 			return nil
 		} else {
 			return errors.New("Inventory corrupted")

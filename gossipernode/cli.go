@@ -36,10 +36,10 @@ func (gossiper *Gossiper) handleCLI(clientPacket *ClientPacket) {
 		gossiper.searchFile(request.Keywords, request.Budget)
 	} else if clientPacket.DownloadRequest != nil {
 		gossiper.downloadFile(clientPacket.DownloadRequest.FileName)
-	} else if clientPacket.NewTransaction != nil {
-		value := clientPacket.NewTransaction.Value
-		to := clientPacket.NewTransaction.To
-		gossiper.createTransaction(value, to)
+	} else if clientPacket.NewTx != nil {
+		value := clientPacket.NewTx.Value
+		to := clientPacket.NewTx.To
+		gossiper.createTx(value, to)
 	} else {
 		gossiper.errLogger.Println("Empty client packet")
 	}

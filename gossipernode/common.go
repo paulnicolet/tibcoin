@@ -29,7 +29,7 @@ type GossipPacket struct {
 	SearchReply   *SearchReply
 	BlockRequest  *BlockRequest
 	BlockReply    *BlockReply
-	Transaction   *SerializableTx
+	Tx            *SerializableTx
 }
 
 type File struct {
@@ -138,7 +138,7 @@ type ClientPacket struct {
 	NewFile           *NewFile
 	DownloadRequest   *DownloadRequest
 	NewSearchRequest  *NewSearchRequest
-	NewTransaction    *NewTransaction
+	NewTx             *NewTx
 }
 
 type NewSearchRequest struct {
@@ -180,7 +180,7 @@ type DownloadRequest struct {
 	MetaHash []byte
 }
 
-type NewTransaction struct {
+type NewTx struct {
 	To    string
 	Value int
 }

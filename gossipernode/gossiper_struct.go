@@ -88,20 +88,20 @@ type Gossiper struct {
 	forksMutex             *sync.Mutex
 	blockOrphanPool        map[[32]byte][32]byte
 	blockOrphanPoolMutex   *sync.Mutex
-	txPool                 []*Transaction
+	txPool                 []*Tx
 	txPoolMutex            *sync.Mutex
 
-	blockInRequest         map[[32]byte][]*net.UDPAddr
-	blockInRequestMutex    *sync.Mutex
-	peerNumRequest         map[*net.UDPAddr]int
-	peerNumRequestMutex    *sync.Mutex
+	blockInRequest      map[[32]byte][]*net.UDPAddr
+	blockInRequestMutex *sync.Mutex
+	peerNumRequest      map[*net.UDPAddr]int
+	peerNumRequestMutex *sync.Mutex
 
-	orphanTxPool      	   []*Transaction
-	orphanTxPoolMutex 	   *sync.Mutex
-	target            	   [32]byte    // TODO: remove and check in last block for target
-	targetMutex       	   *sync.Mutex // TODO: remove
+	orphanTxPool      []*Tx
+	orphanTxPoolMutex *sync.Mutex
+	target            [32]byte    // TODO: remove and check in last block for target
+	targetMutex       *sync.Mutex // TODO: remove
 
-	miningChannel	   	   chan bool
+	miningChannel chan bool
 }
 
 func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDPAddr, peersAddr []*net.UDPAddr, rtimer *time.Duration, noforward bool) (*Gossiper, error) {
@@ -178,13 +178,13 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 		forksMutex:             &sync.Mutex{},
 		blockOrphanPool:        make(map[[32]byte][32]byte),
 		blockOrphanPoolMutex:   &sync.Mutex{},
-		txPool:                 make([]*Transaction, 0),
+		txPool:                 make([]*Tx, 0),
 		txPoolMutex:            &sync.Mutex{},
-		orphanTxPool:           make([]*Transaction, 0),
+		orphanTxPool:           make([]*Tx, 0),
 		orphanTxPoolMutex:      &sync.Mutex{},
 		target:                 BytesToHash(InitialTarget), // TODO: remove and check in last block for target
 		targetMutex:            &sync.Mutex{},              // TODO: remove and check in last block for target
-		miningChannel:			make(chan bool),
+		miningChannel:          make(chan bool),
 	}, nil
 }
 
@@ -219,7 +219,7 @@ func (gossiper *Gossiper) Start() error {
 	go gossiper.DataReplyRoutine(dataReplyChannel)
 	go gossiper.SearchRequestRoutine(searchRequestChannel)
 	go gossiper.SearchReplyRoutine(searchReplyChannel)
-	go gossiper.TransactionRoutine(transactionChannel)
+	go gossiper.TxRoutine(transactionChannel)
 
 	// Spawn anti-antropy
 	go gossiper.AntiEntropyRoutine()

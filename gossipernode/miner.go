@@ -45,7 +45,7 @@ func (gossiper *Gossiper) Mine() (*Block, error) {
 	}
 
 	// Prepend the Coinbase tx to all txs
-	newTxs := make([]*Transaction, 1)
+	newTxs := make([]*Tx, 1)
 	newTxs[0] = coinbaseTx
 	newTxs = append(newTxs, txs...)
 
@@ -94,7 +94,7 @@ func (gossiper *Gossiper) Mine() (*Block, error) {
 			}
 
 			// Prepend the Coinbase tx to all txs
-			newTxs = make([]*Transaction, 1)
+			newTxs = make([]*Tx, 1)
 			newTxs[0] = coinbaseTx
 			newTxs = append(newTxs, txs...)
 		}
@@ -144,7 +144,7 @@ func (gossiper *Gossiper) Mine() (*Block, error) {
 	}
 }
 
-func (gossiper *Gossiper) computeFees(txs []*Transaction) (int, error) {
+func (gossiper *Gossiper) computeFees(txs []*Tx) (int, error) {
 	totalFees := 0
 	for _, tx := range txs {
 		// Get current transaction fee
@@ -159,7 +159,7 @@ func (gossiper *Gossiper) computeFees(txs []*Transaction) (int, error) {
 	return totalFees, nil
 }
 
-func (gossiper *Gossiper) createCoinbaseTx(fees int) (*Transaction, error) {
+func (gossiper *Gossiper) createCoinbaseTx(fees int) (*Tx, error) {
 	// 1 special input (hash = nil, idx = -1)
 	inputs := make([]*TxInput, 1)
 	inputs[0] = &TxInput{
@@ -175,7 +175,7 @@ func (gossiper *Gossiper) createCoinbaseTx(fees int) (*Transaction, error) {
 	}
 
 	// Create tx (unsigned)
-	tx := &Transaction{
+	tx := &Tx{
 		Inputs:    inputs,
 		Outputs:   outputs,
 		PublicKey: gossiper.publicKey,
@@ -191,11 +191,11 @@ func (gossiper *Gossiper) createCoinbaseTx(fees int) (*Transaction, error) {
 }
 
 // Go in the pool and take as much tx as we can (don't remove anything yet)
-func (gossiper *Gossiper) getMaxTxsFromPool() []*Transaction {
+func (gossiper *Gossiper) getMaxTxsFromPool() []*Tx {
 	gossiper.txPoolMutex.Lock()
 
 	// Take txs until max size or pool empty
-	var txs []*Transaction
+	var txs []*Tx
 	currentSize := 0
 	idx := 0
 	for currentSize <= MaxBlockSize && idx < len(gossiper.txPool) {
