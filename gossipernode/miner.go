@@ -2,7 +2,6 @@ package gossipernode
 
 import (
 	"bytes"
-	"fmt"
 	"time"
 )
 
@@ -12,7 +11,7 @@ func (gossiper *Gossiper) Mine() (*Block, error) {
 	// Wait the first time for the channel
 	<-gossiper.miningChannel
 
-	fmt.Println("Started mining node.")
+	gossiper.errLogger.Println("Started mining node.")
 
 	// Get all necessary information to mine new block
 	gossiper.targetMutex.Lock()
@@ -35,6 +34,8 @@ func (gossiper *Gossiper) Mine() (*Block, error) {
 		gossiper.errLogger.Printf("Error when computing fees of txs (prevHash = %x, height = %d); sleeping for 60 sec.\n", prevHash[:], previousBlock.Height+1)
 		time.Sleep(60 * time.Second)
 	}
+
+	gossiper.errLogger.Printf("Fees computed with %d txs: %d\n", len(txs), fees)
 
 	// Create Coinbase transaction
 	coinbaseTx, coinbaseErr := gossiper.createCoinbaseTx(fees)
@@ -83,6 +84,8 @@ func (gossiper *Gossiper) Mine() (*Block, error) {
 				time.Sleep(60 * time.Second)
 			}
 
+			gossiper.errLogger.Printf("Fees computed with %d txs: %d\n", len(txs), fees)
+
 			// Create Coinbase transaction
 			coinbaseTx, coinbaseErr = gossiper.createCoinbaseTx(fees)
 			if coinbaseErr != nil {
@@ -111,7 +114,9 @@ func (gossiper *Gossiper) Mine() (*Block, error) {
 		// See if found new valid block
 		if bytes.Compare(blockHash[:], target[:]) < 0 {
 			// Found block!
-			fmt.Printf("Found new block: %x (height = %d).\n", blockHash[:], previousBlock.Height+1)
+			gossiper.errLogger.Printf("Found new block: %x (height = %d).\n", blockHash[:], previousBlock.Height+1)
+			gossiper.errLogger.Printf("Mined block was worth %d tibcoins.\n", block.Txs[0].Outputs[0].Value)
+
 			gossiper.blocksMutex.Lock()
 			gossiper.blocks[blockHash] = block
 			gossiper.blocksMutex.Unlock()
@@ -206,6 +211,8 @@ func (gossiper *Gossiper) getMaxTxsFromPool() []*Transaction {
 	}
 
 	gossiper.txPoolMutex.Unlock()
+
+	gossiper.errLogger.Printf("Got %d txs from pool to create new block.\n", len(txs))
 
 	return txs
 }

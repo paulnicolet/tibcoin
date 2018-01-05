@@ -341,8 +341,10 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 			if !ok {
 
 				// TODO verfiy block
-				verify := true
+				verify := gossiper.VerifyBlock(reply.Block)
 				if verify {
+
+					gossiper.errLogger.Printf("Block verified: %x\n", reply.Hash[:])
 
 					// check if we are expecting this block
 					gossiper.blockInRequestMutex.Lock()
@@ -457,6 +459,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 
 					return nil
 				} else {
+					gossiper.errLogger.Printf("Block NOT verified: %x\n", reply.Hash[:])
 					return errors.New("Block wrong at verification step")
 				}
 			} else {
