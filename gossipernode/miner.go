@@ -2,6 +2,7 @@ package gossipernode
 
 import (
 	"bytes"
+	"math/rand"
 	"time"
 )
 
@@ -50,7 +51,7 @@ func (gossiper *Gossiper) Mine() (*Block, error) {
 	newTxs = append(newTxs, txs...)
 
 	// Mine until we find a block or we're told to start mining again
-	var nonce uint32 = 0
+	var nonce uint32 = rand.Uint32()
 	resetBlock := false
 
 	for {
@@ -62,6 +63,9 @@ func (gossiper *Gossiper) Mine() (*Block, error) {
 		}
 
 		if resetBlock {
+			// Randomize nonce when resetting
+			nonce = rand.Uint32()
+
 			// Get all necessary information to mine new block
 			gossiper.targetMutex.Lock()
 			target = gossiper.target
