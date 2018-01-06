@@ -173,12 +173,16 @@ func (gossiper *Gossiper) requestBlock(blockHash [32]byte) {
 			var currentRequestedPeer *net.UDPAddr
 			currentRequestedPeer = nil
 
-			for currentRequestedPeer != nil && (currentIdx+1)%len(l) != randomIdx {
+			for currentRequestedPeer == nil {
 				currentRequestedPeer = l[currentIdx%len(l)]
 				if gossiper.peerNumRequest[currentRequestedPeer.String()] >= MAX_REQUEST {
 					currentRequestedPeer = nil
 				}
 				currentIdx++
+
+				if currentIdx%len(l) == randomIdx {
+					break
+				}
 			}
 			gossiper.peerNumRequestMutex.Unlock()
 			gossiper.blockInRequestMutex.Unlock()
