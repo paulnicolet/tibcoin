@@ -365,7 +365,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 	reply := blockReplyPacket.packet.BlockReply
 	from := blockReplyPacket.from
 
-	//gossiper.errLogger.Printf("***********************")
+	gossiper.errLogger.Printf("Received new block from %s", from.String())
 
 	// check if we got a block or inventory
 	// first the block
@@ -392,8 +392,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 				// verfiy block
 				verify := gossiper.VerifyBlock(block)
 				if verify {
-
-					loggerMsg := fmt.Sprintf("[bc_route]: valid block %x received.", reply.Hash[:])
+					gossiper.errLogger.Printf("[bc_route]: valid block %x received.", reply.Hash[:])
 
 					// check if we are expecting this block
 					gossiper.blockInRequestMutex.Lock()
@@ -409,9 +408,9 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 						}
 						gossiper.peersMutex.Unlock()
 
-						loggerMsg += " It's a recently mined block."
+						gossiper.errLogger.Printf("It's a recently mined block")
 					} else {
-						loggerMsg += " It's a requested block."
+						gossiper.errLogger.Printf("It's a requested block")
 					}
 
 					// modifying the blockchain, if needed
@@ -442,8 +441,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 					if found {
 
 						gossiper.blockOrphanPoolMutex.Lock()
-
-						loggerMsg = fmt.Sprintf(loggerMsg+" It's put at the top of %x", toRemove[:])
+						gossiper.errLogger.Printf("It's put at the top of %x", toRemove[:])
 
 						// replace fork top
 						gossiper.forks[reply.Hash] = true
@@ -494,7 +492,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 							if !done {
 								delete(gossiper.blockOrphanPool, currentTopForkHash)
 
-								loggerMsg = fmt.Sprintf(loggerMsg+" Orphan %x is now top of the fork.", currentTopForkHash[:])
+								gossiper.errLogger.Printf("Orphan %x is now top of the fork", currentTopForkHash[:])
 							}
 
 						}
@@ -506,8 +504,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 						currentTopBlock := gossiper.blocks[gossiper.topBlock]
 						gossiper.topBlockMutex.Unlock()
 						if currentTopBlock.Height < currentTopForkBlock.Height {
-
-							loggerMsg += " It's the new longest blockchain."
+							gossiper.errLogger.Printf("It's the new longest blockchain")
 
 							// Clean the txPool from the txs in the new blocks
 							for _, blockToRemoveTxs := range blocksToRemoveTxs {
@@ -518,7 +515,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 							// happening from the main branch and we need to call 'removeBlockTxsFromPool' for all
 							// blocks between the first new block of the fork until the block we've just received (exclusive)
 							if !mainBranch {
-								loggerMsg += " It was a secondary branch that became the main one."
+								gossiper.errLogger.Printf("It was a secondary branch that became the main one")
 
 								// Find the hash of the block that is in the main branch AND in the fork
 								forkHash, forkErr := gossiper.findForkBlockHash(block)
@@ -573,10 +570,8 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 						gossiper.blockOrphanPool[reply.Hash] = reply.Block.PrevHash
 						gossiper.blockOrphanPoolMutex.Unlock()
 
-						loggerMsg += " It's put in the orphan pool."
+						gossiper.errLogger.Printf("It's put in the orphan pool")
 					}
-
-					gossiper.errLogger.Printf(loggerMsg)
 
 					return nil
 				} else {
