@@ -172,9 +172,6 @@ func (gossiper *Gossiper) requestBlock(blockHash [32]byte) {
 
 			gossiper.errLogger.Printf("rdidx = %d", randomIdx)
 
-			var currentRequestedPeer *net.UDPAddr
-			currentRequestedPeer = nil
-
 			for currentRequestedPeer == nil {
 
 				currentRequestedPeer = l[currentIdx%len(l)]
