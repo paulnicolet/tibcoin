@@ -126,7 +126,7 @@ func (gossiper *Gossiper) requestBlock(blockHash [32]byte) {
 		},
 	}
 
-	buffer, err := protobuf.Encode(&packet)
+	buffer, err := protobuf.Encode(packet)
 	if err != nil {
 		gossiper.errLogger.Printf("Error in getBlock: %v", err)
 	}
@@ -277,7 +277,7 @@ func (gossiper *Gossiper) handleBlockRequest(blockRequestPacket *GossiperPacketS
 				},
 			}
 
-			buffer, err := protobuf.Encode(&packet)
+			buffer, err := protobuf.Encode(packet)
 			if err != nil {
 				return err
 			}
