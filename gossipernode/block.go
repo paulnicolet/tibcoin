@@ -317,7 +317,10 @@ func (gossiper *Gossiper) isNewChainBiggerThanMain(block *Block, hash [32]byte) 
 // Check 16
 // Assume locks: topBlock, forks, blocks
 func (gossiper *Gossiper) addToMainBranch(block *Block, hash [32]byte) bool {
-	// TODO: Apply 16.1.1-7 to all txs but coinbase
+	// Apply 16.1.1-7 to all txs but coinbase
+	if !gossiper.VerifyBlockTxs(block) {
+		return false
+	}
 
 	if !gossiper.correctCoinbaseValue(block, hash) {
 		return false
@@ -491,7 +494,10 @@ func (gossiper *Gossiper) verifyNewMainBranch(topBlockFork *Block, topBlockForkH
 
 		// We maybe should do 3-11, but why? Doesn't seem useful...
 
-		// TODO: Apply 16.1.1-7 to all txs but coinbase
+		// Apply 16.1.1-7 to all txs but coinbase
+		if !gossiper.VerifyBlockTxs(currentBlock) {
+			return false
+		}
 
 		if !gossiper.correctCoinbaseValue(currentBlock, currentHash) {
 			return false
@@ -508,9 +514,8 @@ func (gossiper *Gossiper) verifyNewMainBranch(topBlockFork *Block, topBlockForkH
 	for !bytes.Equal(currentHash[:], forkHash[:]) {
 		// Iterate over txs and put valid ones in txPool
 		for _, tx := range currentBlock.Txs[1:] {
-			// TODO: tx checks 2-9 (8 is weird)
-
-			valid := true
+			// tx checks 2-9 (8 is weird)
+			valid := tx.VerifyOldMainBranchTx(gossiper)
 
 			if valid {
 				gossiper.txPoolMutex.Lock()
