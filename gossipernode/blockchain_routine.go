@@ -429,21 +429,24 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 					found := false
 					mainBranch := false
 					foundNewTop := false
-					var toRemove [32]byte
 					for hashTopFork, _ := range gossiper.forks {
 
 						// check if we found a top
 						if bytes.Equal(reply.Block.PrevHash[:], hashTopFork[:]) {
 							found = true
 							foundNewTop = true
-							toRemove = hashTopFork // need to remove this one from fork
 
 							// Checking if we found on the main branch or not
 							gossiper.topBlockMutex.Lock()
 							mainBranch = bytes.Equal(hashTopFork[:], gossiper.topBlock[:])
 							gossiper.topBlockMutex.Unlock()
-						}
 
+							break
+						}
+					}
+
+					// if not found at top, need to check if found in the middle
+					if !found {
 						// check if we are a new fork
 						_, containsOurPrev := gossiper.blocks[reply.Block.PrevHash]
 						if containsOurPrev {
@@ -452,23 +455,18 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 								found = true
 							}
 						}
-
-						// if found either a new top or a new fork, we are done
-						if found {
-							break
-						}
 					}
 
 					if found {
 
-						gossiper.errLogger.Printf("It's put after the block of %x", toRemove[:])
+						gossiper.errLogger.Printf("It's put after the block of %x.", reply.Block.PrevHash[:])
 
 						// replace fork top
 						gossiper.forks[reply.Hash] = true
 						// but remove it from top only if the prev was a top
 						if foundNewTop {
-							gossiper.errLogger.Printf("It's a new top fork")
-							delete(gossiper.forks, toRemove)
+							gossiper.errLogger.Printf("It's a new top fork.")
+							delete(gossiper.forks, reply.Block.PrevHash)
 						}
 
 						// Slice to store all blocks that will need their txs to be removed from the txPool;
