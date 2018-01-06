@@ -162,8 +162,6 @@ func (gossiper *Gossiper) createTx(value int, to string) error {
 		return err
 	}
 
-	gossiper.errLogger.Println(gossiper.VerifyTx(tx))
-
 	gossiper.errLogger.Println(tx)
 
 	// Add to transaction pool
