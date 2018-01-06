@@ -59,18 +59,16 @@ func (tx *Tx) getOutputs(gossiper *Gossiper, lookInPool bool) ([]*TxOutputLocati
 	var outputs []*TxOutputLocation
 	anyMissing := false
 	for _, input := range tx.Inputs {
-		found := false
 		output, err := gossiper.getOutput(input)
+		found := err == nil
 
 		// Look in the pool if not found
 		if lookInPool {
-			if err != nil {
+			if !found {
 				output, err = gossiper.getOutputFromPool(input)
 				if output != nil {
 					found = true
 				}
-			} else {
-				found = true
 			}
 		}
 
