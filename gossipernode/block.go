@@ -95,18 +95,20 @@ func (gossiper *Gossiper) VerifyBlock(block *Block, hash [32]byte) bool {
 		valid = false
 	}
 
-	// Apply tx checks 2-4
-	for _, tx := range block.Txs {
-		if !tx.checkInOutListsNotEmpty() {
-			valid = false
-		}
+	if valid {
+		// Apply tx checks 2-4
+		for _, tx := range block.Txs {
+			if !tx.checkInOutListsNotEmpty() {
+				valid = false
+			}
 
-		if !tx.checkSize() {
-			valid = false
-		}
+			if !tx.checkSize() {
+				valid = false
+			}
 
-		if !tx.checkOutputMoneyRange() {
-			valid = false
+			if !tx.checkOutputMoneyRange() {
+				valid = false
+			}
 		}
 	}
 
