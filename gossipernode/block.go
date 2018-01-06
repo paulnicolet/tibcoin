@@ -474,21 +474,20 @@ func (gossiper *Gossiper) verifyNewMainBranch(topBlockFork *Block, topBlockForkH
 	var blocksToAdd []*Block
 	var hashesToAdd [][32]byte
 
-	blocksToAdd = append(blocksToAdd, topBlockFork)
-	hashesToAdd = append(hashesToAdd, topBlockForkHash)
-
 	currentHash := topBlockForkHash
 	currentBlock := topBlockFork
 	foundBlock := true
 	for !bytes.Equal(currentHash[:], forkHash[:]) {
+
+		blocksToAdd = append(blocksToAdd, topBlockFork)
+		hashesToAdd = append(hashesToAdd, topBlockForkHash)
+
 		currentHash = currentBlock.PrevHash
 		currentBlock, foundBlock = gossiper.blocks[currentHash]
 		if !foundBlock {
 			panic(errors.New(fmt.Sprintf("Cannot find block when verifying new main branch (hash = %x).", currentHash[:])))
 		}
 
-		blocksToAdd = append(blocksToAdd, currentBlock)
-		hashesToAdd = append(hashesToAdd, currentHash)
 	}
 
 	for i := len(blocksToAdd) - 1; i >= 0; i-- {
