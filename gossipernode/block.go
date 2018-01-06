@@ -59,7 +59,7 @@ var GenesisBlock = &Block{
 }
 
 // Inspired by: https://en.bitcoin.it/wiki/Protocol_rules#.22block.22_messages
-func (gossiper *Gossiper) VerifyBlock(serBlock *SerializableBlock, hash [32]byte) bool {
+func (gossiper *Gossiper) VerifyBlock(block *Block, hash [32]byte) bool {
 
 	// Need to take all necessary locks here if VerifyBlock can be called by
 	// multiple threads
@@ -69,17 +69,11 @@ func (gossiper *Gossiper) VerifyBlock(serBlock *SerializableBlock, hash [32]byte
 
 	valid := true
 
-	// Check that the block wasn't corrupted by UDP
-	block, err := serBlock.toNormal()
-	if valid && err != nil {
-		valid = false
-	}
-
 	if valid && gossiper.isCorrupted(block, hash) {
 		valid = false
 	}
 
-	if valid && gossiper.isDuplicate(block, hash) {
+	if valid && gossiper.isBlockDuplicate(block, hash) {
 		valid = false
 	}
 
@@ -95,7 +89,7 @@ func (gossiper *Gossiper) VerifyBlock(serBlock *SerializableBlock, hash [32]byte
 		valid = false
 	}
 
-	if valid && !gossiper.onlyFirstTxIsCoinbase() {
+	if valid && !gossiper.onlyFirstTxIsCoinbase(block, hash) {
 		valid = false
 	}
 
@@ -174,6 +168,8 @@ func (gossiper *Gossiper) VerifyBlock(serBlock *SerializableBlock, hash [32]byte
 
 	/* ******************************* */
 
+	/*
+
 	// Get the hash of the given block
 	blockHash := block.hash()
 
@@ -191,14 +187,14 @@ func (gossiper *Gossiper) VerifyBlock(serBlock *SerializableBlock, hash [32]byte
 
 	// If we couldn't find the top block, we are in a wrong state, we should panic
 	if !blockExists {
-		panic(errors.New(fmt.Sprintf("Cannot find top block (hash = %x).", prevHash[:])))
+		panic(errors.New(fmt.Sprintf("Cannot find top block (hash = %x).", topHash[:])))
 	}
 
 	// Check syntactic correctness?
 
 	// TODO: really needed? it seems already done before calling that by checking in 'blocks'
 	// Reject if duplicate of block in main branch
-	/*
+
 		currentBlock := prevBlock
 		for blockExists {
 			currentHash := currentBlock.hash()
@@ -247,7 +243,7 @@ func (gossiper *Gossiper) VerifyBlock(serBlock *SerializableBlock, hash [32]byte
 			}
 		}
 		gossiper.blockOrphanPoolMutex.Unlock()
-	*/
+
 
 	gossiper.errLogger.Println(1)
 
@@ -342,6 +338,7 @@ func (gossiper *Gossiper) VerifyBlock(serBlock *SerializableBlock, hash [32]byte
 	// TODO rest
 
 	return true
+	*/
 }
 
 /* Verify helpers */
@@ -355,8 +352,8 @@ func (gossiper *Gossiper) isCorrupted(block *Block, hash [32]byte) bool {
 
 // Check 2
 // Assume locks: topBlock, forks, blocks
-func (gossiper *Gossiper) isDuplicate(block *Block, hash [32]byte) bool {
-	_, isDuplicate := blocks[hash]
+func (gossiper *Gossiper) isBlockDuplicate(block *Block, hash [32]byte) bool {
+	_, isDuplicate := gossiper.blocks[hash]
 
 	return isDuplicate
 }
@@ -416,6 +413,10 @@ func (gossiper *Gossiper) isOrphan(block *Block, hash [32]byte) bool {
 // Assume locks: topBlock, forks, blocks
 func (gossiper *Gossiper) containsExpectedTarget(block *Block, hash [32]byte) bool {
 	prevBlock, foundPrevBlock := gossiper.blocks[block.PrevHash]
+	if !foundPrevBlock {
+		panic(errors.New(fmt.Sprintf("Cannot find prev block (hash = %x).", block.PrevHash[:])))
+	}
+	
 	return bytes.Equal(prevBlock.Target[:], block.Target[:])
 }
 
@@ -429,6 +430,7 @@ func (gossiper *Gossiper) isTooLateComparedToMedian(block *Block, hash [32]byte)
 
 	var lastTimestamps int64arr
 	currentBlock := prevBlock
+	blockExists := true
 	for i := 0; i < NbBlocksToCheckForTime && blockExists; i++ {
 		lastTimestamps = append(lastTimestamps, currentBlock.Timestamp)
 
@@ -477,7 +479,7 @@ func (gossiper *Gossiper) isNewChainBiggerThanMain(block *Block, hash [32]byte) 
 func (gossiper *Gossiper) addToMainBranch(block *Block, hash [32]byte) bool {
 	// TODO: Apply 16.1.1-7 to all txs but coinbase
 
-	if !gossiper.correctCoinbaseValue() {
+	if !gossiper.correctCoinbaseValue(block, hash) {
 		return false
 	}
 
@@ -622,7 +624,7 @@ func (gossiper *Gossiper) findForkBlockHash(topBlockFork *Block) ([32]byte, erro
 
 // Check 18.3
 // Assume locks: topBlock, forks, blocks
-func (gossiper *Gossiper) verifyNewMainBranch(topBlockFork *Block, topBlockForkHash [32]byte, forkHash [32]byte) ([32]byte, error) {
+func (gossiper *Gossiper) verifyNewMainBranch(topBlockFork *Block, topBlockForkHash [32]byte, forkHash [32]byte) bool {
 	var blocksToAdd []*Block
 	var hashesToAdd [][32]byte
 
@@ -634,7 +636,7 @@ func (gossiper *Gossiper) verifyNewMainBranch(topBlockFork *Block, topBlockForkH
 	foundBlock := true
 	for !bytes.Equal(currentHash[:], forkHash[:]) {
 		currentHash = currentBlock.PrevHash
-		currentBlock, foundBlock = blocks[currentHash]
+		currentBlock, foundBlock = gossiper.blocks[currentHash]
 		if !foundBlock {
 			panic(errors.New(fmt.Sprintf("Cannot find block when verifying new main branch (hash = %x).", currentHash[:])))
 		}
@@ -657,7 +659,7 @@ func (gossiper *Gossiper) verifyNewMainBranch(topBlockFork *Block, topBlockForkH
 	}
 
 	currentHash = gossiper.topBlock
-	currentBlock, foundBlock = blocks[currentHash]
+	currentBlock, foundBlock = gossiper.blocks[currentHash]
 	if !foundBlock {
 
 	}
@@ -672,13 +674,13 @@ func (gossiper *Gossiper) verifyNewMainBranch(topBlockFork *Block, topBlockForkH
 
 			if valid {
 				gossiper.txPoolMutex.Lock()
-				txPool = append(txPool, tx)
+				gossiper.txPool = append(gossiper.txPool, tx)
 				gossiper.txPoolMutex.Unlock()
 			}
 		}
 
 		currentHash = currentBlock.PrevHash
-		currentBlock, foundBlock = blocks[currentHash]
+		currentBlock, foundBlock = gossiper.blocks[currentHash]
 	}
 
 	// Remove block's txs from the txPool (from the new main branch)
