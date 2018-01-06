@@ -420,6 +420,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 					// modifying the blockchain, if needed
 					gossiper.blocksMutex.Lock()
 					gossiper.forksMutex.Lock()
+					gossiper.blockOrphanPoolMutex.Lock()
 
 					// add the block to the big block map
 					gossiper.blocks[reply.Hash] = block
@@ -443,21 +444,13 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 							gossiper.topBlockMutex.Unlock()
 						}
 
-						// TODO optim break
-						// need to go over all fork chain
-						currentBlock := gossiper.blocks[hashTopFork]
-						currentHash := hashTopFork
-						for !found && !bytes.Equal(currentHash[:], NilHash[:]) {
-
-							// if found => new fork
-							if bytes.Equal(currentHash[:], reply.Block.PrevHash[:]) {
+						// check if we are a new fork
+						_, containsOurPrev := gossiper.blocks[reply.Block.PrevHash]
+						if containsOurPrev {
+							_, isOrphan := gossiper.blockOrphanPool[reply.Block.PrevHash]
+							if !isOrphan {
 								found = true
-								toRemove = currentHash
 							}
-
-							// if not found, pass to the next block in the chain
-							currentHash = currentBlock.PrevHash
-							currentBlock = gossiper.blocks[currentBlock.PrevHash]
 						}
 
 						// if found either a new top or a new fork, we are done
@@ -468,7 +461,6 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 
 					if found {
 
-						gossiper.blockOrphanPoolMutex.Lock()
 						gossiper.errLogger.Printf("It's put after the block of %x", toRemove[:])
 
 						// replace fork top
@@ -594,7 +586,6 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 						gossiper.blocksMutex.Unlock()
 
 						// can't find a place to put it, it's an orphan
-						gossiper.blockOrphanPoolMutex.Lock()
 						gossiper.blockOrphanPool[reply.Hash] = reply.Block.PrevHash
 						gossiper.blockOrphanPoolMutex.Unlock()
 
