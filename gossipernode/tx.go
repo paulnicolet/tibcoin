@@ -131,6 +131,13 @@ const (
 func (gossiper *Gossiper) VerifyTx(tx *Tx) int {
 	gossiper.errLogger.Printf("Verifying tx %x", tx.hash())
 
+	gossiper.blocksMutex.Lock()
+	defer gossiper.blocksMutex.Unlock()
+	gossiper.topBlockMutex.Lock()
+	defer gossiper.topBlockMutex.Unlock()
+	gossiper.txPoolMutex.Lock()
+	defer gossiper.txPoolMutex.Unlock()
+
 	if !tx.checkInOutListsNotEmpty() {
 		return InvalidTx
 	}

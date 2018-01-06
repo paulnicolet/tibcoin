@@ -93,7 +93,20 @@ func (gossiper *Gossiper) VerifyBlock(block *Block, hash [32]byte) bool {
 		valid = false
 	}
 
-	// TODO: apply tx checks 2-4
+	// Apply tx checks 2-4
+	for _, tx := range block.Txs {
+		if !tx.checkInOutListsNotEmpty() {
+			valid = false
+		}
+
+		if !tx.checkSize() {
+			valid = false
+		}
+
+		if !tx.checkOutputMoneyRange() {
+			valid = false
+		}
+	}
 
 	if valid && gossiper.isOrphan(block, hash) {
 		gossiper.blockOrphanPoolMutex.Lock()
@@ -170,57 +183,32 @@ func (gossiper *Gossiper) VerifyBlock(block *Block, hash [32]byte) bool {
 
 	/*
 
-	// Get the hash of the given block
-	blockHash := block.hash()
+		// Get the hash of the given block
+		blockHash := block.hash()
 
-	gossiper.errLogger.Printf("Verifying block: %x\n", blockHash)
+		gossiper.errLogger.Printf("Verifying block: %x\n", blockHash)
 
-	// Get current top hash
-	gossiper.topBlockMutex.Lock()
-	topHash := gossiper.topBlock
-	gossiper.topBlockMutex.Unlock()
+		// Get current top hash
+		gossiper.topBlockMutex.Lock()
+		topHash := gossiper.topBlock
+		gossiper.topBlockMutex.Unlock()
 
-	// Get current top block
-	gossiper.blocksMutex.Lock()
-	topBlock, blockExists := gossiper.blocks[topHash]
-	gossiper.blocksMutex.Unlock()
+		// Get current top block
+		gossiper.blocksMutex.Lock()
+		topBlock, blockExists := gossiper.blocks[topHash]
+		gossiper.blocksMutex.Unlock()
 
-	// If we couldn't find the top block, we are in a wrong state, we should panic
-	if !blockExists {
-		panic(errors.New(fmt.Sprintf("Cannot find top block (hash = %x).", topHash[:])))
-	}
-
-	// Check syntactic correctness?
-
-	// TODO: really needed? it seems already done before calling that by checking in 'blocks'
-	// Reject if duplicate of block in main branch
-
-		currentBlock := prevBlock
-		for blockExists {
-			currentHash := currentBlock.hash()
-			if bytes.Equal(currentHash[:], blockHash[:]) {
-				return false
-			}
-
-			// Get the previous block
-			gossiper.blocksMutex.Lock()
-			currentBlock, blockExists = gossiper.blocks[currentBlock.PrevHash]
-			gossiper.blocksMutex.Unlock()
+		// If we couldn't find the top block, we are in a wrong state, we should panic
+		if !blockExists {
+			panic(errors.New(fmt.Sprintf("Cannot find top block (hash = %x).", topHash[:])))
 		}
 
-		// Reject if duplicate of block in one of the forks
-		gossiper.forksMutex.Lock()
-		for topForkHash, _ := range gossiper.forks {
-			// Get current top fork block
-			gossiper.blocksMutex.Lock()
-			currentBlock, blockExists = gossiper.blocks[topForkHash]
-			gossiper.blocksMutex.Unlock()
+		// Check syntactic correctness?
 
-			// If we couldn't find the top fork block, we are in a wrong state, we should panic
-			if !blockExists {
-				panic(errors.New(fmt.Sprintf("Cannot find top fork block (hash = %x).", topForkHash[:])))
-			}
+		// TODO: really needed? it seems already done before calling that by checking in 'blocks'
+		// Reject if duplicate of block in main branch
 
+			currentBlock := prevBlock
 			for blockExists {
 				currentHash := currentBlock.hash()
 				if bytes.Equal(currentHash[:], blockHash[:]) {
@@ -232,112 +220,137 @@ func (gossiper *Gossiper) VerifyBlock(block *Block, hash [32]byte) bool {
 				currentBlock, blockExists = gossiper.blocks[currentBlock.PrevHash]
 				gossiper.blocksMutex.Unlock()
 			}
-		}
-		gossiper.forksMutex.Unlock()
 
-		// Reject if duplicate of block in orpans
-		gossiper.blockOrphanPoolMutex.Lock()
-		for orphanHash, _ := range gossiper.blockOrphanPool {
-			if bytes.Equal(orphanHash[:], blockHash[:]) {
+			// Reject if duplicate of block in one of the forks
+			gossiper.forksMutex.Lock()
+			for topForkHash, _ := range gossiper.forks {
+				// Get current top fork block
+				gossiper.blocksMutex.Lock()
+				currentBlock, blockExists = gossiper.blocks[topForkHash]
+				gossiper.blocksMutex.Unlock()
+
+				// If we couldn't find the top fork block, we are in a wrong state, we should panic
+				if !blockExists {
+					panic(errors.New(fmt.Sprintf("Cannot find top fork block (hash = %x).", topForkHash[:])))
+				}
+
+				for blockExists {
+					currentHash := currentBlock.hash()
+					if bytes.Equal(currentHash[:], blockHash[:]) {
+						return false
+					}
+
+					// Get the previous block
+					gossiper.blocksMutex.Lock()
+					currentBlock, blockExists = gossiper.blocks[currentBlock.PrevHash]
+					gossiper.blocksMutex.Unlock()
+				}
+			}
+			gossiper.forksMutex.Unlock()
+
+			// Reject if duplicate of block in orpans
+			gossiper.blockOrphanPoolMutex.Lock()
+			for orphanHash, _ := range gossiper.blockOrphanPool {
+				if bytes.Equal(orphanHash[:], blockHash[:]) {
+					return false
+				}
+			}
+			gossiper.blockOrphanPoolMutex.Unlock()
+
+
+		gossiper.errLogger.Println(1)
+
+		// Block hash must satisfy its target
+		if bytes.Compare(blockHash[:], block.Target[:]) >= 0 {
+			return false
+		}
+
+		gossiper.errLogger.Println(2)
+
+		// Block timestamp must not be more than X seconds in the future (currently 2 hours)
+		// TODO (maybe): might need to change the 2 hours in something more meaningful for us
+		if block.Timestamp > time.Now().Unix()+MaxSecondsBlockInFuture {
+			return false
+		}
+
+		gossiper.errLogger.Println(3)
+
+		// First transaction must be coinbase (i.e. only 1 input, with hash=0, idx=-1)
+		coinbaseTx := block.Txs[0]
+		if !coinbaseTx.isCoinbaseTx() {
+			return false
+		}
+
+		gossiper.errLogger.Println(4)
+
+		// and the rest must not be coinbase
+		for i := 1; i < len(block.Txs); i++ {
+			tx := block.Txs[i]
+			if tx.isCoinbaseTx() {
 				return false
 			}
 		}
-		gossiper.blockOrphanPoolMutex.Unlock()
 
+		gossiper.errLogger.Println(5)
 
-	gossiper.errLogger.Println(1)
+		// Re-verify all transactions (in Bitcoin, only doing 2-4 + verifying MerkleTree)
+		for _, tx := range block.Txs {
+			validTx, _ := gossiper.VerifyTx(tx)
+			if !validTx {
+				return false
+			}
 
-	// Block hash must satisfy its target
-	if bytes.Compare(blockHash[:], block.Target[:]) >= 0 {
-		return false
-	}
-
-	gossiper.errLogger.Println(2)
-
-	// Block timestamp must not be more than X seconds in the future (currently 2 hours)
-	// TODO (maybe): might need to change the 2 hours in something more meaningful for us
-	if block.Timestamp > time.Now().Unix()+MaxSecondsBlockInFuture {
-		return false
-	}
-
-	gossiper.errLogger.Println(3)
-
-	// First transaction must be coinbase (i.e. only 1 input, with hash=0, idx=-1)
-	coinbaseTx := block.Txs[0]
-	if !coinbaseTx.isCoinbaseTx() {
-		return false
-	}
-
-	gossiper.errLogger.Println(4)
-
-	// and the rest must not be coinbase
-	for i := 1; i < len(block.Txs); i++ {
-		tx := block.Txs[i]
-		if tx.isCoinbaseTx() {
-			return false
+			// If valid, it might free some orphans
+			gossiper.updateOrphansTx(tx)
 		}
-	}
 
-	gossiper.errLogger.Println(5)
+		gossiper.errLogger.Println(6)
 
-	// Re-verify all transactions (in Bitcoin, only doing 2-4 + verifying MerkleTree)
-	for _, tx := range block.Txs {
-		validTx, _ := gossiper.VerifyTx(tx)
-		if !validTx {
+		// Check that target is indeed the one it should be (checking previous block to see that)
+		// TODO: change this if target change over time, should compute the expected target from the previous
+		// block and check that the current target is indeed what was expected.
+		if !bytes.Equal(prevBlock.Target[:], block.Target[:]) {
 			return false
 		}
 
-		// If valid, it might free some orphans
-		gossiper.updateOrphansTx(tx)
-	}
+		gossiper.errLogger.Println(7)
 
-	gossiper.errLogger.Println(6)
+		// Reject if timestamp is the median time of the last x blocks or before
+		// TODO (maybe): might change the number of blocks to check for that (currently 11)
+		var lastTimestamps int64arr
+		currentBlock := prevBlock
+		for i := 0; i < NbBlocksToCheckForTime && blockExists; i++ {
+			lastTimestamps = append(lastTimestamps, currentBlock.Timestamp)
 
-	// Check that target is indeed the one it should be (checking previous block to see that)
-	// TODO: change this if target change over time, should compute the expected target from the previous
-	// block and check that the current target is indeed what was expected.
-	if !bytes.Equal(prevBlock.Target[:], block.Target[:]) {
-		return false
-	}
+			// Get the previous block
+			gossiper.blocksMutex.Lock()
+			currentBlock, blockExists = gossiper.blocks[currentBlock.PrevHash]
+			gossiper.blocksMutex.Unlock()
+		}
 
-	gossiper.errLogger.Println(7)
+		if len(lastTimestamps) == NbBlocksToCheckForTime {
+			sort.Sort(lastTimestamps)
+			medianTimestamp := lastTimestamps[NbBlocksToCheckForTime/2]
 
-	// Reject if timestamp is the median time of the last x blocks or before
-	// TODO (maybe): might change the number of blocks to check for that (currently 11)
-	var lastTimestamps int64arr
-	currentBlock := prevBlock
-	for i := 0; i < NbBlocksToCheckForTime && blockExists; i++ {
-		lastTimestamps = append(lastTimestamps, currentBlock.Timestamp)
+			if block.Timestamp <= medianTimestamp {
+				return false
+			}
+		}
 
-		// Get the previous block
-		gossiper.blocksMutex.Lock()
-		currentBlock, blockExists = gossiper.blocks[currentBlock.PrevHash]
-		gossiper.blocksMutex.Unlock()
-	}
+		gossiper.errLogger.Println(8)
 
-	if len(lastTimestamps) == NbBlocksToCheckForTime {
-		sort.Sort(lastTimestamps)
-		medianTimestamp := lastTimestamps[NbBlocksToCheckForTime/2]
-
-		if block.Timestamp <= medianTimestamp {
+		// Reject if coinbase value > sum of block creation fee and transaction fees
+		coinbaseValue := block.Txs[0].Outputs[0].Value
+		fees, feesError := gossiper.computeFees(block.Txs[1:])
+		if feesError != nil || fees+BaseReward != coinbaseValue {
 			return false
 		}
-	}
 
-	gossiper.errLogger.Println(8)
+		gossiper.errLogger.Println(9)
 
-	// Reject if coinbase value > sum of block creation fee and transaction fees
-	coinbaseValue := block.Txs[0].Outputs[0].Value
-	fees, feesError := gossiper.computeFees(block.Txs[1:])
-	if feesError != nil || fees+BaseReward != coinbaseValue {
-		return false
-	}
+		// TODO rest
 
-	gossiper.errLogger.Println(9)
-
-	// TODO rest
-
-	return true
+		return true
 	*/
 }
 
@@ -416,7 +429,7 @@ func (gossiper *Gossiper) containsExpectedTarget(block *Block, hash [32]byte) bo
 	if !foundPrevBlock {
 		panic(errors.New(fmt.Sprintf("Cannot find prev block (hash = %x).", block.PrevHash[:])))
 	}
-	
+
 	return bytes.Equal(prevBlock.Target[:], block.Target[:])
 }
 
@@ -435,9 +448,7 @@ func (gossiper *Gossiper) isTooLateComparedToMedian(block *Block, hash [32]byte)
 		lastTimestamps = append(lastTimestamps, currentBlock.Timestamp)
 
 		// Get the previous block
-		gossiper.blocksMutex.Lock()
 		currentBlock, blockExists = gossiper.blocks[currentBlock.PrevHash]
-		gossiper.blocksMutex.Unlock()
 	}
 
 	if len(lastTimestamps) == NbBlocksToCheckForTime {

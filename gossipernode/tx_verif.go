@@ -30,24 +30,19 @@ func (tx *Tx) checkNotCoinbaseTx() bool {
 }
 
 // 8
+// Assume locks: txPool, topBlock, blocks
 func (tx *Tx) checkNotExistsInPoolOrMainBranch(gossiper *Gossiper, lookInMainBranch bool) bool {
 	// Look in the pool
-	gossiper.txPoolMutex.Lock()
 	for _, other := range gossiper.txPool {
 		if tx.equals(other) {
 			return false
 		}
 	}
-	gossiper.txPoolMutex.Unlock()
 
 	if lookInMainBranch {
 		// Look in main branch
-		gossiper.topBlockMutex.Lock()
 		topBlockHash := gossiper.topBlock
-		gossiper.topBlockMutex.Unlock()
-		gossiper.blocksMutex.Lock()
 		currentBlock, blockExists := gossiper.blocks[topBlockHash]
-		gossiper.blocksMutex.Unlock()
 		for blockExists {
 			for _, other := range currentBlock.Txs {
 				if tx.equals(other) {
@@ -55,9 +50,7 @@ func (tx *Tx) checkNotExistsInPoolOrMainBranch(gossiper *Gossiper, lookInMainBra
 				}
 			}
 
-			gossiper.blocksMutex.Lock()
 			currentBlock, blockExists = gossiper.blocks[currentBlock.PrevHash]
-			gossiper.blocksMutex.Unlock()
 		}
 	}
 
@@ -65,10 +58,8 @@ func (tx *Tx) checkNotExistsInPoolOrMainBranch(gossiper *Gossiper, lookInMainBra
 }
 
 // 9
+// Assume locks: txPool
 func (tx *Tx) checkOutputsNotRefInPool(gossiper *Gossiper) bool {
-	gossiper.txPoolMutex.Lock()
-	defer gossiper.txPoolMutex.Unlock()
-
 	for _, other := range gossiper.txPool {
 		for _, otherIn := range other.Inputs {
 			for _, in := range tx.Inputs {
@@ -83,16 +74,13 @@ func (tx *Tx) checkOutputsNotRefInPool(gossiper *Gossiper) bool {
 }
 
 // 12
+// Assume locks topBlock, blocks, txPool
 func (gossiper *Gossiper) checkNotSpentOutputs(outputs []*TxOutputLocation, lookInPool bool) bool {
 	// Get first hash
-	gossiper.topBlockMutex.Lock()
 	topBlockHash := gossiper.topBlock
-	gossiper.topBlockMutex.Unlock()
 
 	// Get block
-	gossiper.blocksMutex.Lock()
 	currentBlock, blockExists := gossiper.blocks[topBlockHash]
-	gossiper.blocksMutex.Unlock()
 
 	// Look for spent outputs
 	for blockExists {
@@ -106,14 +94,11 @@ func (gossiper *Gossiper) checkNotSpentOutputs(outputs []*TxOutputLocation, look
 			}
 		}
 
-		gossiper.blocksMutex.Lock()
 		currentBlock, blockExists = gossiper.blocks[currentBlock.PrevHash]
-		gossiper.blocksMutex.Unlock()
 	}
 
 	if lookInPool {
 		// Look in the pool
-		gossiper.txPoolMutex.Lock()
 		for _, tx := range gossiper.txPool {
 			for _, input := range tx.Inputs {
 				for _, outputLocation := range outputs {
@@ -123,7 +108,6 @@ func (gossiper *Gossiper) checkNotSpentOutputs(outputs []*TxOutputLocation, look
 				}
 			}
 		}
-		gossiper.txPoolMutex.Unlock()
 	}
 
 	return true

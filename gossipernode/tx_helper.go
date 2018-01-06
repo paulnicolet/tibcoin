@@ -54,6 +54,7 @@ func (tx *Tx) getSignable() [32]byte {
 	return BytesToHash(h.Sum(nil))
 }
 
+// Assume locks: txPool
 func (tx *Tx) getOutputs(gossiper *Gossiper, lookInPool bool) ([]*TxOutputLocation, bool) {
 	var outputs []*TxOutputLocation
 	anyMissing := false
@@ -215,10 +216,8 @@ func (in *TxInput) sameOutputLocation(other *TxOutputLocation) bool {
 	return bytes.Equal(in.OutputTxHash[:], other.OutputTxHash[:]) && in.OutputIdx == other.OutputIdx
 }
 
+// Asuume lock: txPool
 func (gossiper *Gossiper) getOutputFromPool(in *TxInput) (*TxOutput, error) {
-	gossiper.txPoolMutex.Lock()
-	defer gossiper.txPoolMutex.Unlock()
-
 	for _, other := range gossiper.txPool {
 		if in.references(other) {
 			return other.Outputs[in.OutputIdx], nil
@@ -229,16 +228,13 @@ func (gossiper *Gossiper) getOutputFromPool(in *TxInput) (*TxOutput, error) {
 }
 
 // We are looking only in the main branch for a correpsonding transaction
+// Assume locks: topBlock, blocks
 func (gossiper *Gossiper) getOutput(in *TxInput) (*TxOutput, error) {
 	// Get top block hash
-	gossiper.topBlockMutex.Lock()
 	topBlock := gossiper.topBlock
-	gossiper.topBlockMutex.Unlock()
 
 	// Get top block
-	gossiper.blocksMutex.Lock()
 	currentBlock, blockExists := gossiper.blocks[topBlock]
-	gossiper.blocksMutex.Unlock()
 
 	if !blockExists {
 		return nil, fmt.Errorf("Top block (hash = %x) not found in 'gossiper.blocks'", topBlock[:])
@@ -257,9 +253,7 @@ func (gossiper *Gossiper) getOutput(in *TxInput) (*TxOutput, error) {
 		}
 
 		// Get the previous block
-		gossiper.blocksMutex.Lock()
 		currentBlock, blockExists = gossiper.blocks[currentBlock.PrevHash]
-		gossiper.blocksMutex.Unlock()
 	}
 
 	return nil, fmt.Errorf("Tx not found in main branch (hash = %x)", in.OutputTxHash[:])
