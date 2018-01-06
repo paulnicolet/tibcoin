@@ -452,6 +452,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 							// if found => new fork
 							if bytes.Equal(currentHash[:], reply.Block.PrevHash[:]) {
 								found = true
+								toRemove = currentHash
 							}
 
 							// if not found, pass to the next block in the chain
@@ -468,12 +469,13 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 					if found {
 
 						gossiper.blockOrphanPoolMutex.Lock()
-						gossiper.errLogger.Printf("It's put at the top of %x", toRemove[:])
+						gossiper.errLogger.Printf("It's put after the block of %x", toRemove[:])
 
 						// replace fork top
 						gossiper.forks[reply.Hash] = true
 						// but remove it from top only if the prev was a top
 						if foundNewTop {
+							gossiper.errLogger.Printf("It's a new top fork")
 							delete(gossiper.forks, toRemove)
 						}
 
