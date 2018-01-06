@@ -90,18 +90,15 @@ type Gossiper struct {
 	blockOrphanPoolMutex   *sync.Mutex
 	txPool                 []*Tx
 	txPoolMutex            *sync.Mutex
-
-	blockInRequest      map[[32]byte][]*net.UDPAddr
-	blockInRequestMutex *sync.Mutex
-	peerNumRequest      map[*net.UDPAddr]int
-	peerNumRequestMutex *sync.Mutex
-
-	orphanTxPool      []*Tx
-	orphanTxPoolMutex *sync.Mutex
-	target            [32]byte    // TODO: remove and check in last block for target
-	targetMutex       *sync.Mutex // TODO: remove
-
-	miningChannel chan bool
+	blockInRequest         map[[32]byte][]*net.UDPAddr
+	blockInRequestMutex    *sync.Mutex
+	peerNumRequest         map[*net.UDPAddr]int
+	peerNumRequestMutex    *sync.Mutex
+	orphanTxPool           []*Tx
+	orphanTxPoolMutex      *sync.Mutex
+	target                 [32]byte    // TODO: remove and check in last block for target
+	targetMutex            *sync.Mutex // TODO: remove
+	miningChannel          chan bool
 }
 
 func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDPAddr, peersAddr []*net.UDPAddr, rtimer *time.Duration, noforward bool) (*Gossiper, error) {
@@ -185,6 +182,10 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 		target:                 BytesToHash(InitialTarget), // TODO: remove and check in last block for target
 		targetMutex:            &sync.Mutex{},              // TODO: remove and check in last block for target
 		miningChannel:          make(chan bool),
+		blockInRequest:         make(map[[32]byte][]*net.UDPAddr),
+		blockInRequestMutex:    &sync.Mutex{},
+		peerNumRequest:         make(map[*net.UDPAddr]int),
+		peerNumRequestMutex:    &sync.Mutex{},
 	}, nil
 }
 
