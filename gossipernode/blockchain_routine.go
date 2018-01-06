@@ -170,23 +170,16 @@ func (gossiper *Gossiper) requestBlock(blockHash [32]byte) {
 			randomIdx := rand.Intn(len(l))
 			currentIdx := randomIdx
 
-			gossiper.errLogger.Printf("rdidx = %d", randomIdx)
-
 			for currentRequestedPeer == nil {
 
 				currentRequestedPeer = l[currentIdx%len(l)]
-				gossiper.errLogger.Printf("looking for a guy to request, %s", currentRequestedPeer.String())
 
 				if gossiper.peerNumRequest[currentRequestedPeer.String()] >= MAX_REQUEST {
-					gossiper.errLogger.Printf("shit1")
-
 					currentRequestedPeer = nil
 				}
 				currentIdx++
 
 				if currentIdx%len(l) == randomIdx {
-					gossiper.errLogger.Printf("shit2")
-
 					break
 				}
 			}
