@@ -14,6 +14,7 @@ import (
 const INVENTORY_SIZE = 10
 const REQUEST_INVENTORY_WAIT = 15
 const REQUEST_BLOCK_WAIT = 5
+const MAX_REQUEST = 3
 const DIFF_TO_DELETE_ORPHAN = 10
 
 func (gossiper *Gossiper) getInventoryRoutine() {
@@ -139,7 +140,7 @@ func (gossiper *Gossiper) requestBlock(blockHash [32]byte) {
 		if currentRequestedPeer != nil {
 
 			gossiper.peerNumRequestMutex.Lock()
-			gossiper.peerNumRequest[currentRequestedPeer]--
+			gossiper.peerNumRequest[currentRequestedPeer.String()]--
 			gossiper.peerNumRequestMutex.Unlock()
 
 			currentRequestedPeer = nil
@@ -153,7 +154,9 @@ func (gossiper *Gossiper) requestBlock(blockHash [32]byte) {
 		// if yes, we destroy ourselves
 		if containsBlock {
 
+			gossiper.blockInRequestMutex.Lock()
 			delete(gossiper.blockInRequest, blockHash)
+			gossiper.blockInRequestMutex.Unlock()
 
 			break
 
@@ -172,7 +175,7 @@ func (gossiper *Gossiper) requestBlock(blockHash [32]byte) {
 
 			for currentRequestedPeer != nil && (currentIdx+1)%len(l) != randomIdx {
 				currentRequestedPeer = l[currentIdx%len(l)]
-				if gossiper.peerNumRequest[currentRequestedPeer] < REQUEST_BLOCK_WAIT {
+				if gossiper.peerNumRequest[currentRequestedPeer.String()] >= MAX_REQUEST {
 					currentRequestedPeer = nil
 				}
 				currentIdx++
@@ -183,7 +186,7 @@ func (gossiper *Gossiper) requestBlock(blockHash [32]byte) {
 			// if any peer is available, send the request
 			if currentRequestedPeer != nil {
 				gossiper.peerNumRequestMutex.Lock()
-				gossiper.peerNumRequest[currentRequestedPeer]++
+				gossiper.peerNumRequest[currentRequestedPeer.String()]++
 				gossiper.peerNumRequestMutex.Unlock()
 
 				_, err = gossiper.gossipConn.WriteToUDP(buffer, currentRequestedPeer)
@@ -219,82 +222,72 @@ func (gossiper *Gossiper) handleBlockRequest(blockRequestPacket *GossiperPacketS
 	// if it is an inventory
 	if request.WaitingInv {
 
-		// first check that we will be able to answer to the requester
-		to, containsOrigin := gossiper.peers[request.Origin]
+		gossiper.topBlockMutex.Lock()
+		currentTopBlockHash := gossiper.topBlock
+		gossiper.topBlockMutex.Unlock()
 
-		// if yes
-		if containsOrigin {
+		// check that we have different top block
+		if !bytes.Equal(currentTopBlockHash[:], request.BlockHash[:]) {
 
-			gossiper.topBlockMutex.Lock()
-			currentTopBlockHash := gossiper.topBlock
-			gossiper.topBlockMutex.Unlock()
+			// the fifo queue that we will send
+			blocksHashChan := make(chan [32]byte, INVENTORY_SIZE)
+			blocksHashChan <- currentTopBlockHash
+			counter := 1
 
-			// check that we have different top block
-			if !bytes.Equal(currentTopBlockHash[:], request.BlockHash[:]) {
+			gossiper.blocksMutex.Lock()
+			currentBlockHash := gossiper.blocks[currentTopBlockHash]
+			gossiper.blocksMutex.Unlock()
 
-				// the fifo queue that we will send
-				blocksHashChan := make(chan [32]byte, INVENTORY_SIZE)
-				blocksHashChan <- currentTopBlockHash
-				counter := 1
+			// loop until we find the requested block, or we reach the genesis block
+			for !bytes.Equal(NilHash[:], currentBlockHash.PrevHash[:]) && !bytes.Equal(currentBlockHash.PrevHash[:], request.BlockHash[:]) {
 
+				// if fifo full, remove the first entered one
+				if counter == INVENTORY_SIZE {
+					counter--
+					<-blocksHashChan
+				}
+
+				// add the new element to the queue
+				blocksHashChan <- currentBlockHash.PrevHash
+				counter++
+
+				// go the to the next block
 				gossiper.blocksMutex.Lock()
-				currentBlockHash := gossiper.blocks[currentTopBlockHash]
+				currentBlockHash = gossiper.blocks[currentBlockHash.PrevHash]
 				gossiper.blocksMutex.Unlock()
 
-				// loop until we find the requested block, or we reach the genesis block
-				for !bytes.Equal(NilHash[:], currentBlockHash.PrevHash[:]) && !bytes.Equal(currentBlockHash.PrevHash[:], request.BlockHash[:]) {
-
-					// if fifo full, remove the first entered one
-					if counter == INVENTORY_SIZE {
-						counter--
-						<-blocksHashChan
-					}
-
-					// add the new element to the queue
-					blocksHashChan <- currentBlockHash.PrevHash
-					counter++
-
-					// go the to the next block
-					gossiper.blocksMutex.Lock()
-					currentBlockHash = gossiper.blocks[currentBlockHash.PrevHash]
-					gossiper.blocksMutex.Unlock()
-
-				}
-
-				// a channel isn't a slice, thus we need to transform it
-				blocksHash := make([][32]byte, counter)
-				concatHash := make([]byte, 0)
-				for i := 0; i < counter; i++ {
-					blocksHash[i] = <-blocksHashChan
-					concatHash = append(concatHash, blocksHash[i][:]...)
-				}
-
-				gossiper.errLogger.Printf("[bc_rout]: valid requested inventory from %s, size send = %d", from.String(), counter)
-
-				// we are ready to send the inventory
-				packet := &GossipPacket{
-					BlockReply: &BlockReply{
-						Origin:     gossiper.name,
-						Hash:       sha256.Sum256(concatHash), // don't forget to verify the slice
-						BlocksHash: blocksHash,
-					},
-				}
-
-				buffer, err := protobuf.Encode(&packet)
-				if err != nil {
-					return err
-				}
-
-				_, err = gossiper.gossipConn.WriteToUDP(buffer, to.addr)
-				return err
-
-			} else {
-				// same top block, nothing to send
-				return nil
 			}
 
+			// a channel isn't a slice, thus we need to transform it
+			blocksHash := make([][32]byte, counter)
+			concatHash := make([]byte, 0)
+			for i := 0; i < counter; i++ {
+				blocksHash[i] = <-blocksHashChan
+				concatHash = append(concatHash, blocksHash[i][:]...)
+			}
+
+			gossiper.errLogger.Printf("[bc_rout]: valid requested inventory from %s, size send = %d", from.String(), counter)
+
+			// we are ready to send the inventory
+			packet := &GossipPacket{
+				BlockReply: &BlockReply{
+					Origin:     gossiper.name,
+					Hash:       sha256.Sum256(concatHash), // don't forget to verify the slice
+					BlocksHash: blocksHash,
+				},
+			}
+
+			buffer, err := protobuf.Encode(&packet)
+			if err != nil {
+				return err
+			}
+
+			_, err = gossiper.gossipConn.WriteToUDP(buffer, from)
+			return err
+
 		} else {
-			return errors.New("Unknown origin")
+			// same top block, nothing to send
+			return nil
 		}
 
 		// else it's a unique block
@@ -308,15 +301,9 @@ func (gossiper *Gossiper) handleBlockRequest(blockRequestPacket *GossiperPacketS
 		// if yes
 		if containsBlock {
 
-			// then check if we know the origin
-			to, containsOrigin := gossiper.peers[request.Origin]
-			if containsOrigin {
-				gossiper.errLogger.Printf("[bc_rout]: valid requested block %x, from %s", request.BlockHash[:], from.String())
+			gossiper.errLogger.Printf("[bc_rout]: valid requested block %x, from %s", request.BlockHash[:], from.String())
 
-				return gossiper.sendBlockTo(block, to.addr)
-			} else {
-				return errors.New("Unknown origin")
-			}
+			return gossiper.sendBlockTo(block, from)
 
 			// error if we don't have the requested block,
 			// a peer should know who has what
