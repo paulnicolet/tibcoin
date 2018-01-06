@@ -64,7 +64,7 @@ func addrInList(l []*net.UDPAddr, e *net.UDPAddr) bool {
 
 func (gossiper *Gossiper) requestBlocksFromInventory(inventory [][32]byte, from *net.UDPAddr) {
 
-	gossiper.errLogger.Printf("[bc_rout]: requested block(s) from inventory of %s", from.String())
+	gossiper.errLogger.Printf("[bc_rout]: requesting block(s) from inventory of %s", from.String())
 
 	for _, hash := range inventory {
 
@@ -203,7 +203,7 @@ func (gossiper *Gossiper) requestBlock(blockHash [32]byte) {
 		if currentRequestedPeer != nil {
 			requestedName = currentRequestedPeer.String()
 		}
-		gossiper.errLogger.Printf("[bc_rout]: requester request block %x to %s", blockHash[:], requestedName)
+		gossiper.errLogger.Printf("[bc_rout]: requesting block %x to %s", blockHash[:], requestedName)
 	}
 }
 
@@ -269,7 +269,7 @@ func (gossiper *Gossiper) handleBlockRequest(blockRequestPacket *GossiperPacketS
 				concatHash = append(concatHash, blocksHash[i][:]...)
 			}
 
-			gossiper.errLogger.Printf("[bc_rout]: valid requested inventory from %s, size send = %d", from.String(), counter)
+			gossiper.errLogger.Printf("[bc_rout]: inventory requested, sending to %s, size send = %d", from.String(), counter)
 
 			// we are ready to send the inventory
 			packet := &GossipPacket{
@@ -304,7 +304,7 @@ func (gossiper *Gossiper) handleBlockRequest(blockRequestPacket *GossiperPacketS
 		// if yes
 		if containsBlock {
 
-			gossiper.errLogger.Printf("[bc_rout]: valid requested block %x, from %s", request.BlockHash[:], from.String())
+			gossiper.errLogger.Printf("[bc_rout]: block requested, sending to %x, from %s", request.BlockHash[:], from.String())
 
 			return gossiper.sendBlockTo(block, from)
 
@@ -337,8 +337,8 @@ func (gossiper *Gossiper) sendBlockTo(block *Block, to *net.UDPAddr) error {
 
 	_, err = gossiper.gossipConn.WriteToUDP(buffer, to)
 
-	tmp := block.hash()
-	gossiper.errLogger.Printf("[bc_rout]: block %x sent to %s", tmp[:], to.String())
+	//tmp := block.hash()
+	//gossiper.errLogger.Printf("[bc_rout]: block %x sent to %s", tmp[:], to.String())
 
 	return err
 }
@@ -371,9 +371,9 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 		}
 
 		if gossiper.VerifyBlock(block, reply.Hash) {
-			gossiper.errLogger.Printf("Verification of new block %x OK!\n", reply.Hash[:])
+			gossiper.errLogger.Printf("Block valid: %x", reply.Hash[:])
 		} else {
-			gossiper.errLogger.Printf("Verification of new block %x FAILED!\n", reply.Hash[:])
+			gossiper.errLogger.Printf("Block invalid: %x", reply.Hash[:])
 		}
 
 		return nil

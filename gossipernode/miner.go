@@ -82,10 +82,10 @@ func (gossiper *Gossiper) Mine() (*Block, error) {
 		// See if found new valid block
 		if bytes.Compare(blockHash[:], target[:]) < 0 {
 			// Verify block
+			gossiper.errLogger.Printf("Found new block worth %d tibcoins: %x (height = %d).\n", block.Txs[0].Outputs[0].Value, blockHash[:], block.Height)
 			if gossiper.VerifyBlock(block, blockHash) {
 				// Found block!
-				gossiper.errLogger.Printf("Found new block: %x (height = %d).\n", blockHash[:], block.Height)
-				gossiper.errLogger.Printf("Mined block was worth %d tibcoins.\n", block.Txs[0].Outputs[0].Value)
+				gossiper.errLogger.Printf("Valid new block")
 			} else {
 				gossiper.errLogger.Println("Invalid mined block")
 			}

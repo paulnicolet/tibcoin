@@ -142,40 +142,28 @@ func (gossiper *Gossiper) VerifyTx(tx *Tx) int {
 		return InvalidTx
 	}
 
-	gossiper.errLogger.Println(1)
-
 	// Check size < block size
 	if !tx.checkSize() {
 		return InvalidTx
 	}
-
-	gossiper.errLogger.Println(2)
 
 	// Each output and total must be in legal money range
 	if !tx.checkOutputMoneyRange() {
 		return InvalidTx
 	}
 
-	gossiper.errLogger.Println(3)
-
 	if !tx.checkNotCoinbaseTx() {
 		return InvalidTx
 	}
-
-	gossiper.errLogger.Println(4)
 
 	// Make sure it is not already in the tx pool or main branch
 	if !tx.checkNotExistsInPoolOrMainBranch(gossiper, true) {
 		return DuplicateTx
 	}
 
-	gossiper.errLogger.Println(5)
-
 	if !tx.checkOutputsNotRefInPool(gossiper) {
 		return InvalidTx
 	}
-
-	gossiper.errLogger.Println(6)
 
 	// Get all the referenced outputs
 	outputs, anyMissing := tx.getOutputs(gossiper, true)
@@ -185,35 +173,25 @@ func (gossiper *Gossiper) VerifyTx(tx *Tx) int {
 		return OrphanTx
 	}
 
-	gossiper.errLogger.Println(7)
-
 	// If all missing, reject
 	if len(outputs) == 0 {
 		return InvalidTx
 	}
-
-	gossiper.errLogger.Println(8)
 
 	// If already spent, reject
 	if !gossiper.checkNotSpentOutputs(outputs, true) {
 		return InvalidTx
 	}
 
-	gossiper.errLogger.Println(9)
-
 	// Check input sum
 	if !tx.checkInputsMoneyRange(outputs) {
 		return InvalidTx
 	}
 
-	gossiper.errLogger.Println(10)
-
 	// Check inputs less than outputs
 	if !tx.checkInputLessThanOutputs(outputs) {
 		return InvalidTx
 	}
-
-	gossiper.errLogger.Println(11)
 
 	// Check sig against each output
 	if !gossiper.checkSig(tx) {
