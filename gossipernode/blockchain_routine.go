@@ -375,8 +375,13 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 	// first the block
 	if reply.Block != nil {
 
-		gossiper.VerifyBlock(reply.Block, reply.Hash)
+		if gossiper.VerifyBlock(reply.Block, reply.Hash) {
+			gossiper.errLogger.Printf("Verification of new block %x OK!\n", reply.Hash[:])
+		} else {
+			gossiper.errLogger.Printf("Verification of new block %x FAILED!\n", reply.Hash[:])
+		}
 
+		/*
 		// check that the block wasn't corrupted by UDP
 		block, err := reply.Block.toNormal()
 		if err != nil {
@@ -597,6 +602,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 		} else {
 			return errors.New("Block corrupted")
 		}
+		*/
 	} else {
 		// we got an inventory
 

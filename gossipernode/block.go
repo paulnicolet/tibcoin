@@ -70,7 +70,7 @@ func (gossiper *Gossiper) VerifyBlock(serBlock *SerializableBlock, hash [32]byte
 	valid := true
 
 	// Check that the block wasn't corrupted by UDP
-	block, err := reply.Block.toNormal()
+	block, err := serBlock.toNormal()
 	if valid && err != nil {
 		valid = false
 	}
@@ -102,6 +102,12 @@ func (gossiper *Gossiper) VerifyBlock(serBlock *SerializableBlock, hash [32]byte
 	// TODO: apply tx checks 2-4
 
 	if valid && gossiper.isOrphan(block, hash) {
+		gossiper.blockOrphanPoolMutex.Lock()
+		gossiper.blockOrphanPool[hash] = block.PrevHash
+		gossiper.blockOrphanPoolMutex.Unlock()
+
+		gossiper.blocks[hash] = block
+
 		gossiper.topBlockMutex.Unlock()
 		gossiper.forksMutex.Unlock()
 		gossiper.blocksMutex.Unlock()
@@ -131,6 +137,38 @@ func (gossiper *Gossiper) VerifyBlock(serBlock *SerializableBlock, hash [32]byte
 	gossiper.topBlockMutex.Unlock()
 	gossiper.forksMutex.Unlock()
 	gossiper.blocksMutex.Unlock()
+
+	if valid {
+		// Recursively check orphans which are our children
+		gossiper.blockOrphanPoolMutex.Lock()
+
+		var orphanHashesToCheck [][32]byte
+		for oprhanHash, prevOrphanHash := range gossiper.blockOrphanPool {
+			if bytes.Equal(hash[:], prevOrphanHash[:]) {
+				orphanHashesToCheck = append(orphanHashesToCheck, oprhanHash)
+			}
+		}
+
+		gossiper.blockOrphanPoolMutex.Unlock()
+
+		for _, orphanHashToCheck := range orphanHashesToCheck {
+			gossiper.blocksMutex.Lock()
+			gossiper.blockOrphanPoolMutex.Lock()
+			orphan, foundOrphan := gossiper.blocks[orphanHashToCheck]
+			delete(gossiper.blocks, orphanHashToCheck)
+			delete(gossiper.blockOrphanPool, orphanHashToCheck)
+			gossiper.blockOrphanPoolMutex.Unlock()
+			gossiper.blocksMutex.Unlock()
+
+			if !foundOrphan {
+				panic(errors.New(fmt.Sprintf("Cannot find orphan block (hash = %x).", orphanHashToCheck)))
+			}
+
+			if !gossiper.VerifyBlock(orphan, orphanHashToCheck) {
+				gossiper.errLogger.Printf("Orphan of %x failed verification; most likely ok (hash = %x).\n", hash[:], orphanHashToCheck[:])
+			}
+		}
+	}
 
 	return valid
 
@@ -521,6 +559,8 @@ func (gossiper *Gossiper) addToSideBranch(block *Block, hash [32]byte) bool {
 	gossiper.blocks[hash] = block
 	gossiper.forks[hash] = true
 	delete(gossiper.forks, block.PrevHash)
+
+	return true
 }
 
 // Check 18
@@ -533,11 +573,16 @@ func (gossiper *Gossiper) replaceMainBranch(block *Block, hash [32]byte) bool {
 		panic(forkErr)
 	}
 
-	// Shorten main branch until found fork (check 18.2)
-	gossiper.topBlock = forkHash
+	if gossiper.verifyNewMainBranch(block, hash, forkHash) {
+		gossiper.blocks[hash] = block
+		gossiper.forks[hash] = true
+		delete(gossiper.forks, block.PrevHash)
+		gossiper.topBlock = hash
+	} else {
+		return false
+	}
 
-	gossiper.verifiyNewMainBranch(block, hash, forkHash)
-
+	return true
 }
 
 // Check 18.1
@@ -577,7 +622,7 @@ func (gossiper *Gossiper) findForkBlockHash(topBlockFork *Block) ([32]byte, erro
 
 // Check 18.3
 // Assume locks: topBlock, forks, blocks
-func (gossiper *Gossiper) verifiyNewMainBranch(topBlockFork *Block, topBlockForkHash [32]byte, forkHash [32]byte) ([32]byte, error) {
+func (gossiper *Gossiper) verifyNewMainBranch(topBlockFork *Block, topBlockForkHash [32]byte, forkHash [32]byte) ([32]byte, error) {
 	var blocksToAdd []*Block
 	var hashesToAdd [][32]byte
 
@@ -598,7 +643,55 @@ func (gossiper *Gossiper) verifiyNewMainBranch(topBlockFork *Block, topBlockFork
 		hashesToAdd = append(hashesToAdd, currentHash)
 	}
 
-	// ...
+	for i := len(blocksToAdd) - 1; i >= 0; i-- {
+		currentBlock = blocksToAdd[i]
+		currentHash = hashesToAdd[i]
+
+		// We maybe should do 3-11, but why? Doesn't seem useful...
+
+		// TODO: Apply 16.1.1-7 to all txs but coinbase
+
+		if !gossiper.correctCoinbaseValue(currentBlock, currentHash) {
+			return false
+		}
+	}
+
+	currentHash = gossiper.topBlock
+	currentBlock, foundBlock = blocks[currentHash]
+	if !foundBlock {
+
+	}
+
+	// Add txs back to the txPool from the old main branch
+	for !bytes.Equal(currentHash[:], forkHash[:]) {
+		// Iterate over txs and put valid ones in txPool
+		for _, tx := range currentBlock.Txs[1:] {
+			// TODO: tx checks 2-9 (8 is weird)
+
+			valid := true
+
+			if valid {
+				gossiper.txPoolMutex.Lock()
+				txPool = append(txPool, tx)
+				gossiper.txPoolMutex.Unlock()
+			}
+		}
+
+		currentHash = currentBlock.PrevHash
+		currentBlock, foundBlock = blocks[currentHash]
+	}
+
+	// Remove block's txs from the txPool (from the new main branch)
+	for i := len(blocksToAdd) - 1; i >= 0; i-- {
+		currentBlock = blocksToAdd[i]
+		currentHash = hashesToAdd[i]
+
+		gossiper.removeBlockTxsFromPool(currentBlock)
+	}
+
+	gossiper.broadcastBlockToPeers(topBlockFork)
+
+	return true
 }
 
 func (block *Block) hash() [32]byte {
