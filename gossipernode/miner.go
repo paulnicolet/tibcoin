@@ -76,6 +76,7 @@ func (gossiper *Gossiper) Mine() (*Block, error) {
 			}
 		}
 
+		block.Nonce++
 		blockHash := block.hash()
 
 		// See if found new valid block
@@ -93,8 +94,6 @@ func (gossiper *Gossiper) Mine() (*Block, error) {
 			gossiper.resetBlock = true
 			gossiper.resetBlockMutex.Unlock()
 		}
-
-		block.Nonce++
 	}
 }
 
