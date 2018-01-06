@@ -1,6 +1,7 @@
 const UPDATE_INTERVAL_SEC = 2
 
 $(document).ready(() => {
+	updateName();
 	setInterval(updateName, UPDATE_INTERVAL_SEC*1000);
 });
 

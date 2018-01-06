@@ -1,6 +1,7 @@
 $(document).ready(() => {
 	$('#message-form').submit(e => submitInput(e, "/message", "#message-form", "#message"));
 
+	updateChatPage();
 	setInterval(updateChatPage, UPDATE_INTERVAL_SEC*1000);
 });
 

@@ -3,6 +3,7 @@ var privateChatUpdater;
 $(document).ready(() => {
 	$('#private-chat-form').submit(e => submitInput(e, "/private", "#private-chat-form", "#private-chat-input"));
 
+	getDestinations();
 	setInterval(getDestinations, UPDATE_INTERVAL_SEC*1000);
 });
 

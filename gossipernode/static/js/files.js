@@ -24,9 +24,7 @@ $(document).ready(() => {
 	});
 
 	// Update matches
-	setInterval(function() {
-		updateMatches();
-	}, MACTHES_UPDATE_DELAY)
+	setInterval(updateMatches, MACTHES_UPDATE_DELAY);
 });
 
 function updateMatches() {

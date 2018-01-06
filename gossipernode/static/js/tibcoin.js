@@ -13,8 +13,9 @@ $(document).ready(() => {
 		}
     });
 
+    updateBlocks();
     getAddress();
-
+    updateBalance();
     setInterval(updateBlocks, BLOCKS_UPDATE_INTERVAL);
     setInterval(updateBalance, BALANCE_UPDATE_INTERVAL);
 });
@@ -94,15 +95,15 @@ function appendBlock(block) {
             });
         }
 
-        var offcanvasBar = $('<div>').addClass('uk-offcanvas-bar');
-        //offcanvasBar.append($('<button>').addClass('uk-offcanvas-close').attr('uk-close', '').attr('type', 'button'));
-        offcanvasBar.append($('<h5>').html('Block transactions'));
-        offcanvasBar.append(txDetails);
+        var modelBody = $('<div>').addClass('uk-modal-dialog uk-modal-body');
+        modelBody.append($('<h5>').html('Block transactions'));
+        modelBody.append($('<div>').html('Block hash: ' + block.Hash).addClass('uk-text-meta'));
+        modelBody.append(txDetails);
     
-        var offcanvas = $('<div>').attr('id', block.Hash).attr('uk-offcanvas', '').attr('flip', 'true');
-        offcanvas.append(offcanvasBar);
+        var modal = $('<div>').attr('id', block.Hash).attr('uk-modal', '');
+        modal.append(modelBody);
 
-        $('#offcanvas-container').append(offcanvas);
+        $('#modals-container').append(modal);
     }
 }
 
