@@ -136,7 +136,6 @@ func (gossiper *Gossiper) VerifyBlock(serBlock *SerializableBlock, hash [32]byte
 
 	/* ******************************* */
 
-
 	// Get the hash of the given block
 	blockHash := block.hash()
 
@@ -156,8 +155,6 @@ func (gossiper *Gossiper) VerifyBlock(serBlock *SerializableBlock, hash [32]byte
 	if !blockExists {
 		panic(errors.New(fmt.Sprintf("Cannot find top block (hash = %x).", prevHash[:])))
 	}
-
-
 
 	// Check syntactic correctness?
 
@@ -323,7 +320,7 @@ func (gossiper *Gossiper) isCorrupted(block *Block, hash [32]byte) bool {
 func (gossiper *Gossiper) isDuplicate(block *Block, hash [32]byte) bool {
 	_, isDuplicate := blocks[hash]
 
-	return isDuplicate	
+	return isDuplicate
 }
 
 // Check 3
@@ -342,7 +339,7 @@ func (gossiper *Gossiper) satisfyTarget(block *Block, hash [32]byte) bool {
 // Check 5
 // Assume locks: topBlock, forks, blocks
 func (gossiper *Gossiper) tooMuchInFuture(block *Block, hash [32]byte) bool {
-	return block.Timestamp > time.Now().Unix() + MaxSecondsBlockInFuture
+	return block.Timestamp > time.Now().Unix()+MaxSecondsBlockInFuture
 }
 
 // Check 6
@@ -423,7 +420,7 @@ func (gossiper *Gossiper) extendsMainChain(block *Block, hash [32]byte) bool {
 
 // Check 15-2
 // Assume locks: topBlock, forks, blocks
-func (gossiper *Gossiper) isNewChainBiggerThanMain(block *Block, hash [32]byte) bool { 
+func (gossiper *Gossiper) isNewChainBiggerThanMain(block *Block, hash [32]byte) bool {
 	prevBlock, foundPrevBlock := gossiper.blocks[block.PrevHash]
 	if !foundPrevBlock {
 		panic(errors.New(fmt.Sprintf("Cannot find prev block (hash = %x).", block.PrevHash[:])))
@@ -434,7 +431,7 @@ func (gossiper *Gossiper) isNewChainBiggerThanMain(block *Block, hash [32]byte) 
 		panic(errors.New(fmt.Sprintf("Cannot find top block (hash = %x).", gossiper.topBlock[:])))
 	}
 
-	return prevBlock.Height + 1 > topBlock.Height
+	return prevBlock.Height+1 > topBlock.Height
 }
 
 // Check 16
@@ -541,7 +538,6 @@ func (gossiper *Gossiper) replaceMainBranch(block *Block, hash [32]byte) bool {
 
 	gossiper.verifiyNewMainBranch(block, hash, forkHash)
 
-
 }
 
 // Check 18.1
@@ -597,6 +593,9 @@ func (gossiper *Gossiper) verifiyNewMainBranch(topBlockFork *Block, topBlockFork
 		if !foundBlock {
 			panic(errors.New(fmt.Sprintf("Cannot find block when verifying new main branch (hash = %x).", currentHash[:])))
 		}
+
+		blocksToAdd = append(blocksToAdd, currentBlock)
+		hashesToAdd = append(hashesToAdd, currentHash)
 	}
 
 	// ...
