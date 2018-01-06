@@ -337,6 +337,8 @@ func (gossiper *Gossiper) addToMainBranch(block *Block, hash [32]byte) bool {
 	gossiper.blocks[hash] = block
 	gossiper.topBlock = hash
 
+	gossiper.miningChannel <- true
+
 	// Filter txPool
 	gossiper.removeBlockTxsFromPool(block)
 
@@ -430,6 +432,8 @@ func (gossiper *Gossiper) replaceMainBranch(block *Block, hash [32]byte) bool {
 		gossiper.forks[hash] = true
 		delete(gossiper.forks, block.PrevHash)
 		gossiper.topBlock = hash
+
+		gossiper.miningChannel <- true
 	} else {
 		return false
 	}
