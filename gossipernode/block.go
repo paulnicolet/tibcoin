@@ -61,6 +61,8 @@ var GenesisBlock = &Block{
 // Inspired by: https://en.bitcoin.it/wiki/Protocol_rules#.22block.22_messages
 func (gossiper *Gossiper) VerifyBlock(block *Block, hash [32]byte) bool {
 
+	gossiper.errLogger.Printf("Verifying block %x\n", hash)
+
 	// Need to take all necessary locks here if VerifyBlock can be called by
 	// multiple threads
 	gossiper.blocksMutex.Lock()
@@ -145,6 +147,7 @@ func (gossiper *Gossiper) VerifyBlock(block *Block, hash [32]byte) bool {
 	gossiper.forksMutex.Unlock()
 	gossiper.blocksMutex.Unlock()
 
+	// Check 19
 	if valid {
 		// Recursively check orphans which are our children
 		gossiper.blockOrphanPoolMutex.Lock()
@@ -514,7 +517,7 @@ func (gossiper *Gossiper) addToMainBranch(block *Block, hash [32]byte) bool {
 func (gossiper *Gossiper) correctCoinbaseValue(block *Block, hash [32]byte) bool {
 	coinbaseValue := block.Txs[0].Outputs[0].Value
 	fees, feesError := gossiper.computeFees(block.Txs[1:])
-	if feesError != nil && fees+BaseReward == coinbaseValue {
+	if feesError == nil && fees+BaseReward == coinbaseValue {
 		return true
 	}
 
