@@ -375,6 +375,8 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 	// first the block
 	if reply.Block != nil {
 
+		gossiper.VerifyBlock(reply.Block, reply.Hash)
+
 		// check that the block wasn't corrupted by UDP
 		block, err := reply.Block.toNormal()
 		if err != nil {
