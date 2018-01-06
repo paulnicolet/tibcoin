@@ -14,7 +14,7 @@ import (
 const MaxBlockSize = 500000
 const MaxCoins = 1000000000
 const MaxSecondsBlockInFuture = 2 * 3600 // 2 hours
-const NbBlocksToCheckForTime = 11 // must be odd
+const NbBlocksToCheckForTime = 11        // must be odd
 
 type Block struct {
 	Timestamp int64
@@ -36,6 +36,7 @@ type SerializableBlock struct {
 
 // Used for sorting []int64
 type int64arr []int64
+
 func (a int64arr) Len() int           { return len(a) }
 func (a int64arr) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a int64arr) Less(i, j int) bool { return a[i] < a[j] }
@@ -170,6 +171,9 @@ func (gossiper *Gossiper) VerifyBlock(block *Block) bool {
 		if !validTx {
 			return false
 		}
+
+		// If valid, it might free some orphans
+		gossiper.updateOrphansTx(tx)
 	}
 
 	// Check that target is indeed the one it should be (checking previous block to see that)
@@ -194,17 +198,17 @@ func (gossiper *Gossiper) VerifyBlock(block *Block) bool {
 
 	if len(lastTimestamps) == NbBlocksToCheckForTime {
 		sort.Sort(lastTimestamps)
-		medianTimestamp := lastTimestamps[NbBlocksToCheckForTime / 2]
+		medianTimestamp := lastTimestamps[NbBlocksToCheckForTime/2]
 
-	    if block.Timestamp <= medianTimestamp {
-	    	return false
-	    }
+		if block.Timestamp <= medianTimestamp {
+			return false
+		}
 	}
 
 	// Reject if coinbase value > sum of block creation fee and transaction fees
 	coinbaseValue := block.Txs[0].Outputs[0].Value
 	fees, feesError := gossiper.computeFees(block.Txs[1:])
-	if feesError != nil || fees + BaseReward != coinbaseValue {
+	if feesError != nil || fees+BaseReward != coinbaseValue {
 		return false
 	}
 
