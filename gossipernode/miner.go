@@ -114,44 +114,10 @@ func (gossiper *Gossiper) Mine() (*Block, error) {
 		// See if found new valid block
 		if bytes.Compare(blockHash[:], target[:]) < 0 {
 			// Verify block
-			verified := true // gossiper.VerifyBlock(block)
-			if verified {
-				gossiper.errLogger.Println("Valid mined block")
-
+			if gossiper.VerifyBlock(block, blockHash) {
 				// Found block!
 				gossiper.errLogger.Printf("Found new block: %x (height = %d).\n", blockHash[:], previousBlock.Height+1)
 				gossiper.errLogger.Printf("Mined block was worth %d tibcoins.\n", block.Txs[0].Outputs[0].Value)
-
-				gossiper.blocksMutex.Lock()
-				gossiper.blocks[blockHash] = block
-				gossiper.blocksMutex.Unlock()
-
-				gossiper.topBlockMutex.Lock()
-				topHash := gossiper.topBlock
-				gossiper.topBlockMutex.Unlock()
-
-				// Remove topBlock from forks
-				gossiper.forksMutex.Lock()
-				delete(gossiper.forks, topHash)
-				gossiper.forks[blockHash] = true
-				gossiper.forksMutex.Unlock()
-
-				gossiper.topBlockMutex.Lock()
-				gossiper.topBlock = blockHash
-				gossiper.topBlockMutex.Unlock()
-
-				// Filter txPool
-				gossiper.removeBlockTxsFromPool(block)
-
-				// Broadcast to peers
-				gossiper.peersMutex.Lock()
-				for _, peer := range gossiper.peers {
-					sendErr := gossiper.sendBlockTo(block, peer.addr)
-					if sendErr != nil {
-						gossiper.errLogger.Printf("Error sending mined block (hash = %x): %v\n", blockHash[:], sendErr)
-					}
-				}
-				gossiper.peersMutex.Unlock()
 			} else {
 				gossiper.errLogger.Println("Invalid mined block")
 			}
