@@ -285,7 +285,7 @@ func (gossiper *Gossiper) findForkBlockHash(topBlockFork *Block) ([32]byte, erro
 
 	// Then we want to go down the fork branch (from the given block) and the first time we see
 	// a hash we've already seen, it will be the block from where we forked
-	topBlockForkHash := currentBlock.hash()
+	topBlockForkHash := topBlockFork.hash()
 	currentBlock = topBlockFork
 	currentHash := topBlockForkHash
 	blockExists = true
