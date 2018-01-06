@@ -557,7 +557,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 							}
 						}
 
-						gossiper.orphanTxPoolMutex.Unlock()
+						gossiper.blockOrphanPoolMutex.Unlock()
 						gossiper.blocksMutex.Unlock()
 
 					} else {
