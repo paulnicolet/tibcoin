@@ -140,10 +140,14 @@ func (gossiper *Gossiper) VerifyBlock(block *Block) bool {
 		return false
 	}
 
+	gossiper.errLogger.Println(1)
+
 	// Block hash must satisfy its target
 	if bytes.Compare(blockHash[:], block.Target[:]) >= 0 {
 		return false
 	}
+
+	gossiper.errLogger.Println(2)
 
 	// Block timestamp must not be more than X seconds in the future (currently 2 hours)
 	// TODO (maybe): might need to change the 2 hours in something more meaningful for us
@@ -151,11 +155,15 @@ func (gossiper *Gossiper) VerifyBlock(block *Block) bool {
 		return false
 	}
 
+	gossiper.errLogger.Println(3)
+
 	// First transaction must be coinbase (i.e. only 1 input, with hash=0, idx=-1)
 	coinbaseTx := block.Txs[0]
 	if !coinbaseTx.isCoinbaseTx() {
 		return false
 	}
+
+	gossiper.errLogger.Println(4)
 
 	// and the rest must not be coinbase
 	for i := 1; i < len(block.Txs); i++ {
@@ -164,6 +172,8 @@ func (gossiper *Gossiper) VerifyBlock(block *Block) bool {
 			return false
 		}
 	}
+
+	gossiper.errLogger.Println(5)
 
 	// Re-verify all transactions (in Bitcoin, only doing 2-4 + verifying MerkleTree)
 	for _, tx := range block.Txs {
@@ -176,12 +186,16 @@ func (gossiper *Gossiper) VerifyBlock(block *Block) bool {
 		gossiper.updateOrphansTx(tx)
 	}
 
+	gossiper.errLogger.Println(6)
+
 	// Check that target is indeed the one it should be (checking previous block to see that)
 	// TODO: change this if target change over time, should compute the expected target from the previous
 	// block and check that the current target is indeed what was expected.
 	if !bytes.Equal(prevBlock.Target[:], block.Target[:]) {
 		return false
 	}
+
+	gossiper.errLogger.Println(7)
 
 	// Reject if timestamp is the median time of the last x blocks or before
 	// TODO (maybe): might change the number of blocks to check for that (currently 11)
@@ -205,12 +219,16 @@ func (gossiper *Gossiper) VerifyBlock(block *Block) bool {
 		}
 	}
 
+	gossiper.errLogger.Println(8)
+
 	// Reject if coinbase value > sum of block creation fee and transaction fees
 	coinbaseValue := block.Txs[0].Outputs[0].Value
 	fees, feesError := gossiper.computeFees(block.Txs[1:])
 	if feesError != nil || fees+BaseReward != coinbaseValue {
 		return false
 	}
+
+	gossiper.errLogger.Println(9)
 
 	// TODO rest
 

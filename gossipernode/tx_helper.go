@@ -180,6 +180,19 @@ func (in *TxInput) sameOutputLocation(other *TxOutputLocation) bool {
 	return bytes.Equal(in.OutputTxHash[:], other.OutputTxHash[:]) && in.OutputIdx == other.OutputIdx
 }
 
+func (gossiper *Gossiper) getOutputFromPool(in *TxInput) (*TxOutput, error) {
+	gossiper.txPoolMutex.Lock()
+	defer gossiper.txPoolMutex.Unlock()
+
+	for _, other := range gossiper.txPool {
+		if in.references(other) {
+			return other.Outputs[in.OutputIdx], nil
+		}
+	}
+
+	return nil, fmt.Errorf("Output not found in tx pool for input %x", in.hash())
+}
+
 // We are looking only in the main branch for a correpsonding transaction
 func (gossiper *Gossiper) getOutput(in *TxInput) (*TxOutput, error) {
 	// Get top block hash
@@ -193,7 +206,7 @@ func (gossiper *Gossiper) getOutput(in *TxInput) (*TxOutput, error) {
 	gossiper.blocksMutex.Unlock()
 
 	if !blockExists {
-		return nil, errors.New(fmt.Sprintf("Top block (hash = %x) not found in 'gossiper.blocks'.", topBlock[:]))
+		return nil, fmt.Errorf("Top block (hash = %x) not found in 'gossiper.blocks'", topBlock[:])
 	}
 
 	for blockExists {
@@ -203,9 +216,8 @@ func (gossiper *Gossiper) getOutput(in *TxInput) (*TxOutput, error) {
 			if bytes.Equal(txHash[:], in.OutputTxHash[:]) {
 				if in.OutputIdx < len(tx.Outputs) {
 					return tx.Outputs[in.OutputIdx], nil
-				} else {
-					return nil, errors.New(fmt.Sprintf("Tx found (hash = %x) but not enough output: expected at least %d, got %d.", txHash[:], in.OutputIdx+1, len(tx.Outputs)))
 				}
+				return nil, fmt.Errorf("Tx found (hash = %x) but not enough output: expected at least %d, got %d", txHash[:], in.OutputIdx+1, len(tx.Outputs))
 			}
 		}
 
@@ -215,9 +227,15 @@ func (gossiper *Gossiper) getOutput(in *TxInput) (*TxOutput, error) {
 		gossiper.blocksMutex.Unlock()
 	}
 
-	return nil, errors.New(fmt.Sprintf("Tx not found in main branch (hash = %x).", in.OutputTxHash[:]))
+	return nil, fmt.Errorf("Tx not found in main branch (hash = %x)", in.OutputTxHash[:])
 }
 
+func (in *TxInput) size() int {
+	// Hardcode input size
+	return 4 + len(in.OutputTxHash)
+}
+
+// Tx outputs internals
 func (gossiper *Gossiper) alreadySpent(outputs []*TxOutputLocation) bool {
 	// Get first hash
 	gossiper.topBlockMutex.Lock()
@@ -262,12 +280,9 @@ func (gossiper *Gossiper) alreadySpent(outputs []*TxOutputLocation) bool {
 	return false
 }
 
-func (in *TxInput) size() int {
-	// Hardcode input size
-	return 4 + len(in.OutputTxHash)
+func (out *TxOutput) legalMoneyRange() bool {
+	return out.Value > 0 || out.Value < MaxCoins
 }
-
-// Tx outputs internals
 
 func (out *TxOutput) hash() [32]byte {
 	h := sha256.New()

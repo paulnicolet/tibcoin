@@ -22,7 +22,7 @@ func (gossiper *Gossiper) handleTx(packet *GossiperPacketSender) error {
 		return err
 	}
 
-	gossiper.errLogger.Printf("\nReceived new tx %x from network: %s", tx.hash(), packet.from.String())
+	gossiper.errLogger.Printf("Received new tx %x from network: %s", tx.hash(), packet.from.String())
 
 	// Verify transaction
 	valid, orphan := gossiper.VerifyTx(tx)
@@ -60,7 +60,7 @@ func (gossiper *Gossiper) broadcastTx(tx *Tx) error {
 		return err
 	}
 
-	gossiper.errLogger.Printf("\nBroadcasting tx to all peers: %x", tx.hash())
+	gossiper.errLogger.Printf("Broadcasting tx to all peers: %x", tx.hash())
 	gossiper.peersMutex.Lock()
 	for _, peer := range gossiper.peers {
 		gossiper.gossipConn.WriteToUDP(buffer, peer.addr)
