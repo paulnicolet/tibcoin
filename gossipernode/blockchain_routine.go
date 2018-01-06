@@ -427,18 +427,43 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 					// see if we can add this block to one of the top fork
 					found := false
 					mainBranch := false
+					foundNewTop := false
 					var toRemove [32]byte
 					for hashTopFork, _ := range gossiper.forks {
+
+						// check if we found a top
 						if bytes.Equal(reply.Block.PrevHash[:], hashTopFork[:]) {
 							found = true
+							foundNewTop = true
 							toRemove = hashTopFork // need to remove this one from fork
 
 							// Checking if we found on the main branch or not
 							gossiper.topBlockMutex.Lock()
 							mainBranch = bytes.Equal(hashTopFork[:], gossiper.topBlock[:])
 							gossiper.topBlockMutex.Unlock()
+						}
 
-							// TODO: we can break here, right?
+						// TODO optim break
+						// need to go over all fork chain
+						currentBlock := gossiper.blocks[hashTopFork]
+						currentHash := currentBlock.hash()
+						genesisHash := GenesisBlock.hash()
+						for !bytes.Equal(currentHash[:], genesisHash[:]) {
+
+							// if found => new fork
+							if bytes.Equal(currentHash[:], reply.Block.PrevHash[:]) {
+								found = true
+								break
+							}
+
+							// if not found, pass to the next block in the chain
+							currentBlock = gossiper.blocks[currentBlock.PrevHash]
+							currentHash = currentBlock.hash()
+						}
+
+						// if found either a new top or a new fork, we are done
+						if found {
+							break
 						}
 					}
 
@@ -449,9 +474,8 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 
 						// replace fork top
 						gossiper.forks[reply.Hash] = true
-						// but remove it from top only if its not the genesis (genesis always one of the top fork)
-						tmp := GenesisBlock.hash()
-						if !bytes.Equal(toRemove[:], tmp[:]) {
+						// but remove it from top only if the prev was a top
+						if foundNewTop {
 							delete(gossiper.forks, toRemove)
 						}
 
