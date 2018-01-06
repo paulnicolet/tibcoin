@@ -383,11 +383,11 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 		if !corrupted {
 
 			gossiper.blocksMutex.Lock()
-			_, ok := gossiper.blocks[reply.Hash]
+			_, alreadyHaveBlock := gossiper.blocks[reply.Hash]
 			gossiper.blocksMutex.Unlock()
 
 			// check if we don't already have the block
-			if !ok {
+			if !alreadyHaveBlock {
 
 				// verfiy block
 				verify := gossiper.VerifyBlock(block)
@@ -396,12 +396,12 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 
 					// check if we are expecting this block
 					gossiper.blockInRequestMutex.Lock()
-					_, ok := gossiper.blockInRequest[reply.Hash]
+					_, isRequestedBlock := gossiper.blockInRequest[reply.Hash]
 					gossiper.blockInRequestMutex.Unlock()
 
 					// it's a totally unexpected block =>
 					// it's a recently mined block, needs to forward to our neighboor
-					if !ok {
+					if !isRequestedBlock {
 						gossiper.peersMutex.Lock()
 						for _, peer := range gossiper.peers {
 							gossiper.sendBlockTo(block, peer.addr)
