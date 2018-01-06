@@ -317,6 +317,7 @@ func (gossiper *Gossiper) isNewChainBiggerThanMain(block *Block, hash [32]byte) 
 // Check 16
 // Assume locks: topBlock, forks, blocks
 func (gossiper *Gossiper) addToMainBranch(block *Block, hash [32]byte) bool {
+	gossiper.errLogger.Println("Adding block to main branch")
 	// Apply 16.1.1-7 to all txs but coinbase
 	if !gossiper.VerifyBlockTxs(block) {
 		return false
@@ -401,6 +402,7 @@ func (gossiper *Gossiper) broadcastBlockToPeers(block *Block) {
 // Check 17
 // Assume locks: topBlock, forks, blocks
 func (gossiper *Gossiper) addToSideBranch(block *Block, hash [32]byte) bool {
+	gossiper.errLogger.Println("Adding to side branch")
 	gossiper.blocks[hash] = block
 	gossiper.forks[hash] = true
 	delete(gossiper.forks, block.PrevHash)
@@ -411,6 +413,7 @@ func (gossiper *Gossiper) addToSideBranch(block *Block, hash [32]byte) bool {
 // Check 18
 // Assume locks: topBlock, forks, blocks
 func (gossiper *Gossiper) replaceMainBranch(block *Block, hash [32]byte) bool {
+	gossiper.errLogger.Println("Replaing main branch")
 	forkHash, forkErr := gossiper.findForkBlockHash(block)
 
 	// If couldnt find fork, we are in a bad state, panic

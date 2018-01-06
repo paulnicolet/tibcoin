@@ -227,7 +227,7 @@ func (gossiper *Gossiper) Start() error {
 	go gossiper.blockRequestRoutine(blockRequestChannel)
 	go gossiper.blockReplyRoutine(blockReplyChannel)
 	go gossiper.TxRoutine(transactionChannel)
-	//go gossiper.getInventoryRoutine()
+	go gossiper.getInventoryRoutine()
 
 	// Spawn anti-antropy
 	go gossiper.AntiEntropyRoutine()
