@@ -25,13 +25,14 @@ func (gossiper *Gossiper) handleTx(packet *GossiperPacketSender) error {
 	gossiper.errLogger.Printf("Received new tx %x from network: %s", tx.hash(), packet.from.String())
 
 	// Verify transaction
-	valid, orphan := gossiper.VerifyTx(tx)
-	if !valid {
-		gossiper.errLogger.Printf("\nInvalid tx: reject %x", tx.hash())
+	validationResult := gossiper.VerifyTx(tx)
+	if validationResult == InvalidTx {
+		gossiper.errLogger.Printf("Invalid tx: reject %x", tx.hash())
 		return errors.New("Error during transaction verification")
-	}
-
-	if orphan {
+	} else if validationResult == DuplicateTx {
+		gossiper.errLogger.Printf("Tx already in pool, ignoring: %x", tx.hash())
+		return nil
+	} else if validationResult == OrphanTx {
 		gossiper.addToOrphanPool(tx)
 		return nil
 	}
