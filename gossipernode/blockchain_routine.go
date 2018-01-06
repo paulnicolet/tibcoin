@@ -423,11 +423,19 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 
 					// see if we can add this block to one of the top fork
 					found := false
+					mainBranch := false
 					var toRemove [32]byte
 					for hashTopFork, _ := range gossiper.forks {
 						if bytes.Equal(reply.Block.PrevHash[:], hashTopFork[:]) {
 							found = true
 							toRemove = hashTopFork // need to remove this one from fork
+
+							// Checking if we found on the main branch or not
+							gossiper.topBlockMutex.Lock()
+							mainBranch = bytes.Equal(hashTopFork[:], gossiper.topBlock[:])
+							gossiper.topBlockMutex.Unlock()
+
+							// TODO: we can break here, right?
 						}
 					}
 
@@ -444,6 +452,12 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 						if !bytes.Equal(toRemove[:], tmp[:]) {
 							delete(gossiper.forks, toRemove)
 						}
+
+						// Slice to store all blocks that will need their txs to be removed from the txPool;
+						// it will happen when the current block is the prev of a orphan block: we should
+						// not forget to remove txs of this block from txPool
+						var blocksToRemoveTxs []*Block
+						blocksToRemoveTxs = append(blocksToRemoveTxs, block)
 
 						// fixed point needed to move on we had the possibility to put the new block at the top of the updated fork
 						currentTopForkHash := reply.Hash
@@ -462,6 +476,10 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 									newBlockTop := gossiper.blocks[hash]
 
 									currentTopForkBlock = newBlockTop
+
+									// Append orphan to slice containing all blocks from which
+									// we'll remove txs from txPool
+									blocksToRemoveTxs = append(blocksToRemoveTxs, newBlockTop)
 
 									// replace fork top
 									gossiper.forks[hash] = true
@@ -486,17 +504,48 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 						// now that the new top fork is at its max, need to compare with current top
 						gossiper.topBlockMutex.Lock()
 						currentTopBlock := gossiper.blocks[gossiper.topBlock]
+						gossiper.topBlockMutex.Unlock()
 						if currentTopBlock.Height < currentTopForkBlock.Height {
 
 							loggerMsg += " It's the new longest blockchain."
 
-							gossiper.topBlock = currentTopForkHash
+							// Clean the txPool from the txs in the new blocks
+							for _, blockToRemoveTxs := range blocksToRemoveTxs {
+								gossiper.removeBlockTxsFromPool(blockToRemoveTxs)
+							}
 
-							// Clean the txPool from the tx in the new block
-							// TODO: What happens if we haven't removed the txs from previous blocks
-							// because we changed of fork, or the new top was an orphan? We need to
-							// remove those txs too I think
-							gossiper.removeBlockTxsFromPool(currentTopForkBlock)
+							// If a secondary branch became the main branch, we need to find where is the fork
+							// happening from the main branch and we need to call 'removeBlockTxsFromPool' for all
+							// blocks between the first new block of the fork until the block we've just received (exclusive)
+							if !mainBranch {
+								loggerMsg += " It was a secondary branch that became the main one."
+
+								// Find the hash of the block that is in the main branch AND in the fork
+								forkHash, forkErr := gossiper.findForkBlockHash(block)
+								if forkErr != nil {
+									return forkErr
+								}
+
+								// Remove txs from txPool for all blocks between the block we've just received
+								// (exclusive) and the the first new block of the fork
+								currentHash := block.PrevHash
+								for !bytes.Equal(currentHash[:], forkHash[:]) {
+									currentBlock, blockExists := gossiper.blocks[currentHash]
+									if !blockExists {
+										return errors.New(fmt.Sprintf("Couldn't find block in 'gossiper.blocks' (hash = %x).", currentHash[:]))
+									}
+
+									// Remove this block's txs from txPool
+									gossiper.removeBlockTxsFromPool(currentBlock)
+
+									currentHash = currentBlock.PrevHash
+								}
+							}
+
+							// Update topBlock
+							gossiper.topBlockMutex.Lock()
+							gossiper.topBlock = currentTopForkHash
+							gossiper.topBlockMutex.Unlock()
 
 							// Warn Miner that he lost the round
 							gossiper.miningChannel <- true
@@ -510,7 +559,6 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 								}
 							}
 						}
-						gossiper.topBlockMutex.Unlock()
 
 						gossiper.orphanTxPoolMutex.Unlock()
 						gossiper.blocksMutex.Unlock()
@@ -532,7 +580,6 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 
 					return nil
 				} else {
-					gossiper.errLogger.Printf("Block NOT correct: %x\n", reply.Hash[:])
 					return errors.New("Block wrong at verification step")
 				}
 			} else {

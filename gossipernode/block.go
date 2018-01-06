@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -13,6 +14,7 @@ import (
 const MaxBlockSize = 500000
 const MaxCoins = 1000000000
 const MaxSecondsBlockInFuture = 2 * 3600 // 2 hours
+const NbBlocksToCheckForTime = 11 // must be odd
 
 type Block struct {
 	Timestamp int64
@@ -32,6 +34,12 @@ type SerializableBlock struct {
 	Txs       []*SerializableTx
 }
 
+// Used for sorting []int64
+type int64arr []int64
+func (a int64arr) Len() int           { return len(a) }
+func (a int64arr) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a int64arr) Less(i, j int) bool { return a[i] < a[j] }
+
 var NilHash = BytesToHash(make([]byte, 32))
 
 var InitialTarget, _ = hex.DecodeString("00000F0000000000000000000000000000000000000000000000000000000000")
@@ -49,7 +57,7 @@ var GenesisBlock = &Block{
 	Txs:       make([]*Tx, 0),
 }
 
-// See: https://en.bitcoin.it/wiki/Protocol_rules#.22block.22_messages
+// Inspired by: https://en.bitcoin.it/wiki/Protocol_rules#.22block.22_messages
 func (gossiper *Gossiper) VerifyBlock(block *Block) bool {
 	// Get the hash of the given block
 	blockHash := block.hash()
@@ -171,8 +179,34 @@ func (gossiper *Gossiper) VerifyBlock(block *Block) bool {
 		return false
 	}
 
-	// Reject if timestamp is the median time of the last 11 blocks or before
+	// Reject if timestamp is the median time of the last x blocks or before
 	// TODO (maybe): might change the number of blocks to check for that (currently 11)
+	var lastTimestamps int64arr
+	currentBlock := prevBlock
+	for i := 0; i < NbBlocksToCheckForTime && blockExists; i++ {
+		lastTimestamps = append(lastTimestamps, currentBlock.Timestamp)
+
+		// Get the previous block
+		gossiper.blocksMutex.Lock()
+		currentBlock, blockExists = gossiper.blocks[currentBlock.PrevHash]
+		gossiper.blocksMutex.Unlock()
+	}
+
+	if len(lastTimestamps) == NbBlocksToCheckForTime {
+		sort.Sort(lastTimestamps)
+		medianTimestamp := lastTimestamps[NbBlocksToCheckForTime / 2]
+
+	    if block.Timestamp <= medianTimestamp {
+	    	return false
+	    }
+	}
+
+	// Reject if coinbase value > sum of block creation fee and transaction fees
+	coinbaseValue := block.Txs[0].Outputs[0].Value
+	fees, feesError := gossiper.computeFees(block.Txs[1:])
+	if feesError != nil || fees + BaseReward != coinbaseValue {
+		return false
+	}
 
 	// TODO rest
 
@@ -206,6 +240,43 @@ func (gossiper *Gossiper) removeBlockTxsFromPool(block *Block) {
 	gossiper.txPool = filteredPool
 
 	gossiper.txPoolMutex.Unlock()
+}
+
+// Already have 'gossiper.blocksMutex' when calling this function
+func (gossiper *Gossiper) findForkBlockHash(topBlockFork *Block) ([32]byte, error) {
+	gossiper.topBlockMutex.Lock()
+
+	// First we should go down the entire main chain and store all hashes
+	var mainHashes map[[32]byte]bool = make(map[[32]byte]bool)
+	mainHashes[gossiper.topBlock] = true
+	currentBlock, blockExists := gossiper.blocks[gossiper.topBlock]
+	for blockExists {
+		// Don't add prev of genesis block
+		if !bytes.Equal(currentBlock.PrevHash[:], NilHash[:]) {
+			mainHashes[currentBlock.PrevHash] = true
+		}
+
+		currentBlock, blockExists = gossiper.blocks[currentBlock.PrevHash]
+	}
+
+	gossiper.topBlockMutex.Unlock()
+
+	// Then we want to go down the fork branch (from the given block) and the first time we see
+	// a hash we've already seen, it will be the block from where we forked
+	topBlockForkHash := currentBlock.hash()
+	currentBlock = topBlockFork
+	currentHash := topBlockForkHash
+	blockExists = true
+	for blockExists {
+		if _, found := mainHashes[currentHash]; found {
+			return currentHash, nil
+		}
+
+		currentHash = currentBlock.PrevHash
+		currentBlock, blockExists = gossiper.blocks[currentHash]
+	}
+
+	return NilHash, errors.New(fmt.Sprintf("Couldn't find the block from where we forked on the main branch; block in fork: %x.", topBlockForkHash[:]))
 }
 
 func (block *Block) hash() [32]byte {
