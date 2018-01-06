@@ -54,6 +54,41 @@ func (tx *Tx) getSignable() [32]byte {
 	return BytesToHash(h.Sum(nil))
 }
 
+func (tx *Tx) getOutputs(gossiper *Gossiper, lookInPool bool) ([]*TxOutputLocation, bool) {
+	var outputs []*TxOutputLocation
+	anyMissing := false
+	for _, input := range tx.Inputs {
+		found := false
+		output, err := gossiper.getOutput(input)
+
+		// Look in the pool if not found
+		if lookInPool {
+			if err != nil {
+				output, err = gossiper.getOutputFromPool(input)
+				if output != nil {
+					found = true
+				}
+			} else {
+				found = true
+			}
+		}
+
+		if found {
+			// If found, collect output, to check if spent later on (to go only once through the chain)
+			location := &TxOutputLocation{
+				Output:       output,
+				OutputTxHash: input.OutputTxHash,
+				OutputIdx:    input.OutputIdx,
+			}
+			outputs = append(outputs, location)
+		} else {
+			anyMissing = true
+		}
+	}
+
+	return outputs, anyMissing
+}
+
 func (tx *Tx) equals(other *Tx) bool {
 	if !tx.Sig.Equal(other.Sig) {
 		return false
@@ -233,51 +268,6 @@ func (gossiper *Gossiper) getOutput(in *TxInput) (*TxOutput, error) {
 func (in *TxInput) size() int {
 	// Hardcode input size
 	return 4 + len(in.OutputTxHash)
-}
-
-// Tx outputs internals
-func (gossiper *Gossiper) alreadySpent(outputs []*TxOutputLocation) bool {
-	// Get first hash
-	gossiper.topBlockMutex.Lock()
-	topBlockHash := gossiper.topBlock
-	gossiper.topBlockMutex.Unlock()
-
-	// Get block
-	gossiper.blocksMutex.Lock()
-	currentBlock, blockExists := gossiper.blocks[topBlockHash]
-	gossiper.blocksMutex.Unlock()
-
-	// Look for spent outputs
-	for blockExists {
-		for _, tx := range currentBlock.Txs {
-			for _, input := range tx.Inputs {
-				for _, outputLocation := range outputs {
-					if input.sameOutputLocation(outputLocation) {
-						return true
-					}
-				}
-			}
-		}
-
-		gossiper.blocksMutex.Lock()
-		currentBlock, blockExists = gossiper.blocks[currentBlock.PrevHash]
-		gossiper.blocksMutex.Unlock()
-	}
-
-	// Look in the pool
-	gossiper.txPoolMutex.Lock()
-	for _, tx := range gossiper.txPool {
-		for _, input := range tx.Inputs {
-			for _, outputLocation := range outputs {
-				if input.sameOutputLocation(outputLocation) {
-					return true
-				}
-			}
-		}
-	}
-	gossiper.txPoolMutex.Unlock()
-
-	return false
 }
 
 func (out *TxOutput) legalMoneyRange() bool {

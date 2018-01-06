@@ -119,138 +119,101 @@ func (gossiper *Gossiper) NewTx(to string, value int) (*Tx, error) {
 	return tx, nil
 }
 
+const (
+	ValidTx = iota
+	InvalidTx
+	OrphanTx
+	DuplicateTx
+)
+
 // From Mastering Bitcoin book
-// Returns (validated, orphan)
-func (gossiper *Gossiper) VerifyTx(tx *Tx) (bool, bool) {
+// Returns (validated, orphan, already in pool)
+func (gossiper *Gossiper) VerifyTx(tx *Tx) int {
 	gossiper.errLogger.Printf("Verifying tx %x", tx.hash())
 
-	// Check neither in or out lists are empty
-	if len(tx.Inputs) == 0 || len(tx.Outputs) == 0 {
-		return false, false
+	if !tx.checkInOutListsNotEmpty() {
+		return InvalidTx
 	}
 
 	gossiper.errLogger.Println(1)
 
 	// Check size < block size
-	if tx.size() >= MaxBlockSize {
-		return false, false
+	if !tx.checkSize() {
+		return InvalidTx
 	}
 
 	gossiper.errLogger.Println(2)
 
 	// Each output and total must be in legal money range
-	outputSum := 0
-	for _, output := range tx.Outputs {
-		outputSum += output.Value
-		if output.Value <= 0 || output.Value > MaxCoins {
-			return false, false
-		}
+	if !tx.checkOutputMoneyRange() {
+		return InvalidTx
 	}
 
 	gossiper.errLogger.Println(3)
 
-	if outputSum > MaxCoins {
-		return false, false
+	if !tx.checkNotCoinbaseTx() {
+		return InvalidTx
 	}
 
 	gossiper.errLogger.Println(4)
 
-	// Make sure it is not already in the tx pool
-	gossiper.txPoolMutex.Lock()
-	for _, other := range gossiper.txPool {
-		if tx.equals(other) {
-			return false, false
-		}
+	// Make sure it is not already in the tx pool or main branch
+	if !tx.checkNotExistsInPoolOrMainBranch(gossiper, true) {
+		return DuplicateTx
 	}
-	gossiper.txPoolMutex.Unlock()
 
 	gossiper.errLogger.Println(5)
 
-	// Cut short if coinbase tx
-	if tx.isCoinbaseTx() {
-		gossiper.errLogger.Println("It is a coinbase tx")
-		return gossiper.checkSig(tx), false
+	if !tx.checkOutputsNotRefInPool(gossiper) {
+		return InvalidTx
 	}
 
 	gossiper.errLogger.Println(6)
 
-	// Look for corresponding UTXOs in main branch and tx pool
-	inputSum := 0
-	var outputs []*TxOutputLocation
-	anyMissing := false
-	allMissing := true
-	for _, input := range tx.Inputs {
-		found := false
-		output, err := gossiper.getOutput(input)
+	// Get all the referenced outputs
+	outputs, anyMissing := tx.getOutputs(gossiper, true)
 
-		// Look in the pool if not found
-		if err != nil {
-			output, err = gossiper.getOutputFromPool(input)
-			if output != nil {
-				found = true
-
-				inputSum += output.Value
-				if !output.legalMoneyRange() {
-					return false, false
-				}
-			}
-		} else {
-			found = true
-
-			// Check that input values are in legal money range BTW
-			inputSum += output.Value
-			if !output.legalMoneyRange() {
-				return false, false
-			}
-		}
-
-		if found {
-			allMissing = false
-
-			// If found, collect output, to check if spent later on (to go only once through the chain)
-			location := &TxOutputLocation{
-				Output:       output,
-				OutputTxHash: input.OutputTxHash,
-				OutputIdx:    input.OutputIdx,
-			}
-			outputs = append(outputs, location)
-		} else {
-			anyMissing = true
-		}
+	// If any missing, it is an orphan
+	if len(outputs) != 0 && anyMissing {
+		return OrphanTx
 	}
 
 	gossiper.errLogger.Println(7)
 
-	// If none of the UTXO's is found, reject
-	if allMissing {
-		return false, false
+	// If all missing, reject
+	if len(outputs) == 0 {
+		return InvalidTx
 	}
 
 	gossiper.errLogger.Println(8)
 
-	// Check if found outputs have been spent already
-	if gossiper.alreadySpent(outputs) {
-		return false, false
+	// If already spent, reject
+	if !gossiper.checkNotSpentOutputs(outputs, true) {
+		return InvalidTx
 	}
 
 	gossiper.errLogger.Println(9)
 
-	// If any is not found, it is an orphan
-	if anyMissing {
-		return false, true
+	// Check input sum
+	if !tx.checkInputsMoneyRange(outputs) {
+		return InvalidTx
 	}
 
 	gossiper.errLogger.Println(10)
 
-	// Check that sum of input > sum of outputs
-	if inputSum <= outputSum {
-		return false, false
+	// Check inputs less than outputs
+	if !tx.checkInputLessThanOutputs(outputs) {
+		return InvalidTx
 	}
 
 	gossiper.errLogger.Println(11)
 
 	// Check sig against each output
-	return gossiper.checkSig(tx), false
+	if !gossiper.checkSig(tx) {
+		return InvalidTx
+	}
+
+	return ValidTx
 }
 
 // Return an error if an input didn't correspond to any known output in the main branch
@@ -420,9 +383,9 @@ func (gossiper *Gossiper) updateOrphansTx(tx *Tx) {
 		for _, input := range orphan.Inputs {
 			// If orphan references tx, try to validate it
 			if input.references(tx) {
-				valid, _ := gossiper.VerifyTx(orphan)
+				validationResult := gossiper.VerifyTx(orphan)
 
-				if valid {
+				if validationResult == ValidTx {
 					gossiper.errLogger.Printf("Tx not orphan anymore: %x", orphan.hash())
 
 					// Remove from orphans
@@ -445,10 +408,6 @@ func (gossiper *Gossiper) updateOrphansTx(tx *Tx) {
 	}
 }
 
-func (tx *Tx) isCoinbaseTx() bool {
-	return len(tx.Inputs) == 1 && bytes.Equal(tx.Inputs[0].OutputTxHash[:], NilHash[:]) && tx.Inputs[0].OutputIdx == -1
-}
-
 func (gossiper *Gossiper) addToPool(tx *Tx) {
 	gossiper.errLogger.Printf("Adding tx to txPool: %x", tx.hash())
 	gossiper.txPoolMutex.Lock()
@@ -461,4 +420,8 @@ func (gossiper *Gossiper) addToOrphanPool(tx *Tx) {
 	gossiper.orphanTxPoolMutex.Lock()
 	gossiper.orphanTxPool = append(gossiper.orphanTxPool, tx)
 	gossiper.orphanTxPoolMutex.Unlock()
+}
+
+func (tx *Tx) isCoinbaseTx() bool {
+	return len(tx.Inputs) == 1 && bytes.Equal(tx.Inputs[0].OutputTxHash[:], NilHash[:]) && tx.Inputs[0].OutputIdx == -1
 }
