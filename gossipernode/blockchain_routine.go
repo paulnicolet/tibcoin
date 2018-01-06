@@ -428,21 +428,15 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 					// see if we can add this block to one of the top fork
 					found := false
 					mainBranch := false
-					foundNewTop := false
-					for hashTopFork, _ := range gossiper.forks {
+					// check if we found a top
+					_, foundNewTop := gossiper.forks[reply.Block.PrevHash]
+					if foundNewTop {
+						found = true
 
-						// check if we found a top
-						if bytes.Equal(reply.Block.PrevHash[:], hashTopFork[:]) {
-							found = true
-							foundNewTop = true
-
-							// Checking if we found on the main branch or not
-							gossiper.topBlockMutex.Lock()
-							mainBranch = bytes.Equal(hashTopFork[:], gossiper.topBlock[:])
-							gossiper.topBlockMutex.Unlock()
-
-							break
-						}
+						// Checking if we found on the main branch or not
+						gossiper.topBlockMutex.Lock()
+						mainBranch = bytes.Equal(reply.Block.PrevHash[:], gossiper.topBlock[:])
+						gossiper.topBlockMutex.Unlock()
 					}
 
 					// if not found at top, need to check if found in the middle
