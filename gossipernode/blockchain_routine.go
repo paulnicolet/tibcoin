@@ -23,15 +23,19 @@ func (gossiper *Gossiper) getInventoryRoutine() {
 	// see if you are behind
 	for range time.NewTicker(time.Second * REQUEST_INVENTORY_WAIT).C {
 
+		gossiper.topBlockMutex.Lock()
+		currentTopBlock := gossiper.topBlock
+		gossiper.topBlockMutex.Unlock()
+
 		packet := &GossipPacket{
 			BlockRequest: &BlockRequest{
 				Origin:     gossiper.name,
-				BlockHash:  gossiper.topBlock,
+				BlockHash:  currentTopBlock,
 				WaitingInv: true,
 			},
 		}
 
-		buffer, err := protobuf.Encode(&packet)
+		buffer, err := protobuf.Encode(packet)
 		if err != nil {
 			gossiper.errLogger.Printf("Error in getInventory: %v", err)
 		}
