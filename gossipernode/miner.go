@@ -9,60 +9,23 @@ import (
 const BaseReward = 1000
 
 func (gossiper *Gossiper) Mine() (*Block, error) {
-	// Wait the first time for the channel
-	<-gossiper.miningChannel
-
 	gossiper.errLogger.Println("Started mining node.")
-
-	// Get all necessary information to mine new block
-	gossiper.targetMutex.Lock()
-	target := gossiper.target
-	gossiper.targetMutex.Unlock()
-
-	gossiper.topBlockMutex.Lock()
-	prevHash := gossiper.topBlock
-	gossiper.topBlockMutex.Unlock()
-
-	gossiper.blocksMutex.Lock()
-	previousBlock, _ := gossiper.blocks[prevHash]
-	gossiper.blocksMutex.Unlock()
-
-	txs := gossiper.getMaxTxsFromPool()
-
-	// Compute the fees
-	fees, feesErr := gossiper.computeFees(txs)
-	if feesErr != nil {
-		gossiper.errLogger.Printf("Error when computing fees of txs (prevHash = %x, height = %d); sleeping for 60 sec.\n", prevHash[:], previousBlock.Height+1)
-		time.Sleep(60 * time.Second)
-	}
-
-	gossiper.errLogger.Printf("Fees computed with %d txs: %d\n", len(txs), fees)
-
-	// Create Coinbase transaction
-	coinbaseTx, coinbaseErr := gossiper.createCoinbaseTx(fees)
-	if coinbaseErr != nil {
-		gossiper.errLogger.Printf("Error when signing coinbase tx (prevHash = %x, height = %d); sleeping for 60 sec.\n", prevHash[:], previousBlock.Height+1)
-		time.Sleep(60 * time.Second)
-	}
-
-	// Prepend the Coinbase tx to all txs
-	newTxs := make([]*Tx, 1)
-	newTxs[0] = coinbaseTx
-	newTxs = append(newTxs, txs...)
 
 	// Mine until we find a block or we're told to start mining again
 	var nonce uint32 = rand.Uint32()
-	resetBlock := false
+	var block *Block
+	var target [32]byte
 
 	for {
-		select {
-		case <-gossiper.miningChannel:
-			resetBlock = true
-		default:
-			// Do nothing
-		}
+		gossiper.resetBlockMutex.Lock()
+		resetBlock := gossiper.resetBlock
+		gossiper.resetBlockMutex.Unlock()
 
 		if resetBlock {
+			gossiper.resetBlockMutex.Lock()
+			gossiper.resetBlock = false
+			gossiper.resetBlockMutex.Unlock()
+
 			// Randomize nonce when resetting
 			nonce = rand.Uint32()
 
@@ -72,17 +35,17 @@ func (gossiper *Gossiper) Mine() (*Block, error) {
 			gossiper.targetMutex.Unlock()
 
 			gossiper.topBlockMutex.Lock()
-			prevHash = gossiper.topBlock
+			prevHash := gossiper.topBlock
 			gossiper.topBlockMutex.Unlock()
 
 			gossiper.blocksMutex.Lock()
-			previousBlock, _ = gossiper.blocks[prevHash]
+			previousBlock, _ := gossiper.blocks[prevHash]
 			gossiper.blocksMutex.Unlock()
 
-			txs = gossiper.getMaxTxsFromPool()
+			txs := gossiper.getMaxTxsFromPool()
 
 			// Compute the fees
-			fees, feesErr = gossiper.computeFees(txs)
+			fees, feesErr := gossiper.computeFees(txs)
 			if feesErr != nil {
 				gossiper.errLogger.Printf("Error when computing fees of txs (prevHash = %x, height = %d); sleeping for 60 sec.\n", prevHash[:], previousBlock.Height+1)
 				time.Sleep(60 * time.Second)
@@ -91,26 +54,26 @@ func (gossiper *Gossiper) Mine() (*Block, error) {
 			gossiper.errLogger.Printf("Fees computed with %d txs: %d\n", len(txs), fees)
 
 			// Create Coinbase transaction
-			coinbaseTx, coinbaseErr = gossiper.createCoinbaseTx(fees)
+			coinbaseTx, coinbaseErr := gossiper.createCoinbaseTx(fees)
 			if coinbaseErr != nil {
 				gossiper.errLogger.Printf("Error when signing coinbase tx (prevHash = %x, height = %d); sleeping for 60 sec.\n", prevHash[:], previousBlock.Height+1)
 				time.Sleep(60 * time.Second)
 			}
 
 			// Prepend the Coinbase tx to all txs
-			newTxs = make([]*Tx, 1)
+			newTxs := make([]*Tx, 1)
 			newTxs[0] = coinbaseTx
 			newTxs = append(newTxs, txs...)
-		}
 
-		// Create new block + hash
-		block := &Block{
-			Timestamp: time.Now().Unix(),
-			Height:    previousBlock.Height + 1,
-			Nonce:     nonce,
-			PrevHash:  prevHash,
-			Txs:       newTxs,
-			Target:    BytesToHash(InitialTarget),
+			// Create new block + hash
+			block = &Block{
+				Timestamp: time.Now().Unix(),
+				Height:    previousBlock.Height + 1,
+				Nonce:     nonce,
+				PrevHash:  prevHash,
+				Txs:       newTxs,
+				Target:    BytesToHash(InitialTarget),
+			}
 		}
 
 		blockHash := block.hash()
@@ -120,15 +83,15 @@ func (gossiper *Gossiper) Mine() (*Block, error) {
 			// Verify block
 			if gossiper.VerifyBlock(block, blockHash) {
 				// Found block!
-				gossiper.errLogger.Printf("Found new block: %x (height = %d).\n", blockHash[:], previousBlock.Height+1)
+				gossiper.errLogger.Printf("Found new block: %x (height = %d).\n", blockHash[:], block.Height)
 				gossiper.errLogger.Printf("Mined block was worth %d tibcoins.\n", block.Txs[0].Outputs[0].Value)
 			} else {
 				gossiper.errLogger.Println("Invalid mined block")
 			}
 
-			resetBlock = true
-		} else {
-			resetBlock = false
+			gossiper.resetBlockMutex.Lock()
+			gossiper.resetBlock = true
+			gossiper.resetBlockMutex.Unlock()
 		}
 
 		nonce++

@@ -337,7 +337,9 @@ func (gossiper *Gossiper) addToMainBranch(block *Block, hash [32]byte) bool {
 	gossiper.blocks[hash] = block
 	gossiper.topBlock = hash
 
-	gossiper.miningChannel <- true
+	gossiper.resetBlockMutex.Lock()
+	gossiper.resetBlock = true
+	gossiper.resetBlockMutex.Unlock()
 
 	// Filter txPool
 	gossiper.removeBlockTxsFromPool(block)
@@ -433,7 +435,9 @@ func (gossiper *Gossiper) replaceMainBranch(block *Block, hash [32]byte) bool {
 		delete(gossiper.forks, block.PrevHash)
 		gossiper.topBlock = hash
 
-		gossiper.miningChannel <- true
+		gossiper.resetBlockMutex.Lock()
+		gossiper.resetBlock = true
+		gossiper.resetBlockMutex.Unlock()
 	} else {
 		return false
 	}

@@ -98,7 +98,8 @@ type Gossiper struct {
 	orphanTxPoolMutex      *sync.Mutex
 	target                 [32]byte    // TODO: remove and check in last block for target
 	targetMutex            *sync.Mutex // TODO: remove
-	miningChannel          chan bool
+	resetBlock             bool
+	resetBlockMutex        *sync.Mutex
 }
 
 func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDPAddr, peersAddr []*net.UDPAddr, rtimer *time.Duration, noforward bool) (*Gossiper, error) {
@@ -186,11 +187,12 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 		orphanTxPoolMutex:      &sync.Mutex{},
 		target:                 BytesToHash(InitialTarget), // TODO: remove and check in last block for target
 		targetMutex:            &sync.Mutex{},              // TODO: remove and check in last block for target
-		miningChannel:          make(chan bool),
 		blockInRequest:         make(map[[32]byte][]*net.UDPAddr),
 		blockInRequestMutex:    &sync.Mutex{},
 		peerNumRequest:         peerNumRequest,
 		peerNumRequestMutex:    &sync.Mutex{},
+		resetBlock:             true, // Start mining directly
+		resetBlockMutex:        &sync.Mutex{},
 	}, nil
 }
 
@@ -274,9 +276,6 @@ func (gossiper *Gossiper) Start() error {
 
 		}
 	*/
-
-	// TODO: Do this to start mining. Should we only start when we are up to date and have all the blocks?
-	gossiper.miningChannel <- true
 
 	select {}
 }
