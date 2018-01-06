@@ -94,7 +94,7 @@ func (gossiper *Gossiper) Mine() (*Block, error) {
 			gossiper.resetBlockMutex.Unlock()
 		}
 
-		nonce++
+		block.Nonce++
 	}
 }
 
