@@ -133,10 +133,13 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 		Y: privateKey.PublicKey.Y,
 	}
 
-	// Init first block
+	// Init block chain
 	blocks := make(map[[32]byte]*Block)
 	genesisHash := GenesisBlock.hash()
 	blocks[genesisHash] = GenesisBlock
+
+	forks := make(map[[32]byte]bool)
+	forks[genesisHash] = true
 
 	return &Gossiper{
 		name:                   name,
@@ -171,7 +174,7 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 		topBlockMutex:          &sync.Mutex{},
 		blocks:                 blocks,
 		blocksMutex:            &sync.Mutex{},
-		forks:                  make(map[[32]byte]bool),
+		forks:                  forks,
 		forksMutex:             &sync.Mutex{},
 		blockOrphanPool:        make(map[[32]byte][32]byte),
 		blockOrphanPoolMutex:   &sync.Mutex{},
@@ -220,9 +223,11 @@ func (gossiper *Gossiper) Start() error {
 	go gossiper.DataReplyRoutine(dataReplyChannel)
 	go gossiper.SearchRequestRoutine(searchRequestChannel)
 	go gossiper.SearchReplyRoutine(searchReplyChannel)
+
 	go gossiper.blockRequestRoutine(blockRequestChannel)
 	go gossiper.blockReplyRoutine(blockReplyChannel)
 	go gossiper.TxRoutine(transactionChannel)
+	go gossiper.getInventoryRoutine()
 
 	// Spawn anti-antropy
 	go gossiper.AntiEntropyRoutine()

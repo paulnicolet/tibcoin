@@ -17,7 +17,7 @@ const REQUEST_INVENTORY_WAIT = 15
 const REQUEST_BLOCK_WAIT = 5
 const DIFF_TO_DELETE_ORPHAN = 10
 
-func (gossiper *Gossiper) getInventory() {
+func (gossiper *Gossiper) getInventoryRoutine() {
 
 	// every predefined time, you request to all your neighboor their top block to
 	// see if you are behind
@@ -392,7 +392,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 				// verfiy block
 				verify := gossiper.VerifyBlock(block)
 				if verify {
-					gossiper.errLogger.Printf("[bc_route]: valid block %x received.", reply.Hash[:])
+					gossiper.errLogger.Printf("[bc_route]: valid block %x received and prevhash %x.", reply.Hash[:], reply.Block.PrevHash[:])
 
 					// check if we are expecting this block
 					gossiper.blockInRequestMutex.Lock()
