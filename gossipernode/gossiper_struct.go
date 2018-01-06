@@ -92,7 +92,7 @@ type Gossiper struct {
 	txPoolMutex            *sync.Mutex
 	blockInRequest         map[[32]byte][]*net.UDPAddr
 	blockInRequestMutex    *sync.Mutex
-	peerNumRequest         map[*net.UDPAddr]int
+	peerNumRequest         map[string]int
 	peerNumRequestMutex    *sync.Mutex
 	orphanTxPool           []*Tx
 	orphanTxPoolMutex      *sync.Mutex
@@ -117,9 +117,11 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 	}
 
 	peers := make(map[string]*Peer, 0)
+	peerNumRequest := make(map[string]int)
 	for _, addr := range peersAddr {
 		if addr.String() != gossipAddr.String() {
 			peers[addr.String()] = &Peer{addr: addr, mutex: &sync.Mutex{}}
+			peerNumRequest[addr.String()] = 0
 		}
 	}
 
@@ -187,7 +189,7 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 		miningChannel:          make(chan bool),
 		blockInRequest:         make(map[[32]byte][]*net.UDPAddr),
 		blockInRequestMutex:    &sync.Mutex{},
-		peerNumRequest:         make(map[*net.UDPAddr]int),
+		peerNumRequest:         peerNumRequest,
 		peerNumRequestMutex:    &sync.Mutex{},
 	}, nil
 }

@@ -290,6 +290,10 @@ func (gossiper *Gossiper) addPeer(peerAddr *net.UDPAddr) {
 	relay := peerAddr.String()
 	if _, in := gossiper.peers[relay]; !in {
 		gossiper.peers[relay] = &Peer{addr: peerAddr, mutex: &sync.Mutex{}}
+
+		gossiper.peerNumRequestMutex.Lock()
+		gossiper.peerNumRequest[relay] = 0
+		gossiper.peerNumRequestMutex.Unlock()
 	}
 }
 
