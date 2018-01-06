@@ -132,15 +132,17 @@ func (gossiper *Gossiper) VerifyBlock(block *Block, hash [32]byte) bool {
 		valid = false
 	}
 
-	if gossiper.extendsMainChain(block, hash) {
-		// Case 1
-		valid = gossiper.addToMainBranch(block, hash)
-	} else if !gossiper.isNewChainBiggerThanMain(block, hash) {
-		// Case 2
-		valid = gossiper.addToSideBranch(block, hash)
-	} else {
-		// Case 3
-		valid = gossiper.replaceMainBranch(block, hash)
+	if valid {
+		if gossiper.extendsMainChain(block, hash) {
+			// Case 1
+			valid = gossiper.addToMainBranch(block, hash)
+		} else if !gossiper.isNewChainBiggerThanMain(block, hash) {
+			// Case 2
+			valid = gossiper.addToSideBranch(block, hash)
+		} else {
+			// Case 3
+			valid = gossiper.replaceMainBranch(block, hash)
+		}
 	}
 
 	gossiper.topBlockMutex.Unlock()
