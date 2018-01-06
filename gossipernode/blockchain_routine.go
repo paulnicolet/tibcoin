@@ -446,19 +446,17 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 						// TODO optim break
 						// need to go over all fork chain
 						currentBlock := gossiper.blocks[hashTopFork]
-						currentHash := currentBlock.hash()
-						genesisHash := GenesisBlock.hash()
-						for !bytes.Equal(currentHash[:], genesisHash[:]) {
+						currentHash := hashTopFork
+						for !found && !bytes.Equal(currentHash[:], NilHash[:]) {
 
 							// if found => new fork
 							if bytes.Equal(currentHash[:], reply.Block.PrevHash[:]) {
 								found = true
-								break
 							}
 
 							// if not found, pass to the next block in the chain
+							currentHash = currentBlock.PrevHash
 							currentBlock = gossiper.blocks[currentBlock.PrevHash]
-							currentHash = currentBlock.hash()
 						}
 
 						// if found either a new top or a new fork, we are done
