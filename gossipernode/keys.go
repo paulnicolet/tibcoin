@@ -44,7 +44,7 @@ func PublicKeyToAddress(public *PublicKey) string {
 	shaSum1 := sha256.Sum256(pubKeyHash)
 	checkSum := sha256.Sum256(shaSum1[:])
 
-	address := base58.CheckEncode(append(pubKeyHash, checkSum[:4]...), byte(1))
+	address := base58.CheckEncode(append(pubKeyHash, checkSum[:4]...), byte(0))
 	return address
 }
 
