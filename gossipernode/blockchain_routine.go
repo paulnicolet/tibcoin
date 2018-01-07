@@ -336,7 +336,7 @@ func (gossiper *Gossiper) sendBlockTo(block *Block, to *net.UDPAddr) error {
 	}
 
 	bytesSent, err := gossiper.gossipConn.WriteToUDP(buffer, to)
-	gossiper.errLogger.Printf("Sent blokc (%d bytes) to %s: %x", bytesSent, to.String(), block.hash())
+	gossiper.errLogger.Printf("Sent block (%d bytes) to %s: %x", bytesSent, to.String(), block.hash())
 
 	//tmp := block.hash()
 	//gossiper.errLogger.Printf("[bc_rout]: block %x sent to %s", tmp[:], to.String())

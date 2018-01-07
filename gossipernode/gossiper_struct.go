@@ -284,11 +284,13 @@ func (gossiper *Gossiper) Listen(conn *net.UDPConn, channel chan<- *Packet) {
 	for {
 		// Read from connection
 		buffer := make([]byte, 2*ChunkSize)
-		_, sender, err := conn.ReadFromUDP(buffer)
+		bytesReceived, sender, err := conn.ReadFromUDP(buffer)
 		if err != nil {
 			gossiper.errLogger.Println(err.Error())
 			continue
 		}
+		gossiper.errLogger.Printf("Payload received (%d bytes)", bytesReceived)
+
 		channel <- &Packet{from: sender, payload: buffer}
 	}
 }
