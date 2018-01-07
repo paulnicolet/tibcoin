@@ -14,7 +14,6 @@ func (gossiper *Gossiper) Mine() (*Block, error) {
 	// Mine until we find a block or we're told to start mining again
 	var nonce uint32 = rand.Uint32()
 	var block *Block
-	var target [32]byte
 
 	for {
 		gossiper.resetBlockMutex.Lock()
@@ -30,9 +29,6 @@ func (gossiper *Gossiper) Mine() (*Block, error) {
 			nonce = rand.Uint32()
 
 			// Get all necessary information to mine new block
-			gossiper.targetMutex.Lock()
-			target = gossiper.target
-			gossiper.targetMutex.Unlock()
 
 			gossiper.topBlockMutex.Lock()
 			prevHash := gossiper.topBlock
@@ -80,7 +76,7 @@ func (gossiper *Gossiper) Mine() (*Block, error) {
 		blockHash := block.hash()
 
 		// See if found new valid block
-		if bytes.Compare(blockHash[:], target[:]) < 0 {
+		if bytes.Compare(blockHash[:], InitialTarget) < 0 {
 			// Verify block
 			gossiper.errLogger.Printf("Found new block worth %d tibcoins: %x (height = %d).\n", block.Txs[0].Outputs[0].Value, blockHash[:], block.Height)
 			if gossiper.VerifyBlock(block, blockHash) {

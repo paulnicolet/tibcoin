@@ -96,8 +96,6 @@ type Gossiper struct {
 	peerNumRequestMutex    *sync.Mutex
 	orphanTxPool           []*Tx
 	orphanTxPoolMutex      *sync.Mutex
-	target                 [32]byte    // TODO: remove and check in last block for target
-	targetMutex            *sync.Mutex // TODO: remove
 	resetBlock             bool
 	resetBlockMutex        *sync.Mutex
 }
@@ -185,8 +183,6 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 		txPoolMutex:            &sync.Mutex{},
 		orphanTxPool:           make([]*Tx, 0),
 		orphanTxPoolMutex:      &sync.Mutex{},
-		target:                 BytesToHash(InitialTarget), // TODO: remove and check in last block for target
-		targetMutex:            &sync.Mutex{},              // TODO: remove and check in last block for target
 		blockInRequest:         make(map[[32]byte][]*net.UDPAddr),
 		blockInRequestMutex:    &sync.Mutex{},
 		peerNumRequest:         peerNumRequest,
