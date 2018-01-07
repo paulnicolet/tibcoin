@@ -22,6 +22,7 @@ func (gossiper *Gossiper) LaunchWebServer() {
 	r.HandleFunc("/search", gossiper.NewSearchHandler).Methods("POST")
 	r.HandleFunc("/download", gossiper.NewDownloadHandler).Methods("POST")
 	r.HandleFunc("/tx", gossiper.NewTxHandler).Methods("POST")
+	r.HandleFunc("/tibcoin-node", gossiper.NewTibcoinNode).Methods("POST")
 
 	// GET
 	r.HandleFunc("/chat", gossiper.ChatHandler).Methods("GET")
@@ -182,7 +183,12 @@ func (gossiper *Gossiper) GetBalanceHandler(w http.ResponseWriter, r *http.Reque
 }
 
 func (gossiper *Gossiper) GetAddressHandler(w http.ResponseWriter, r *http.Request) {
-	m := map[string]interface{}{"address": PublicKeyToAddress(gossiper.publicKey)}
+	address := ""
+	if gossiper.isTibcoinNode() {
+		address = PublicKeyToAddress(gossiper.publicKey)
+	}
+
+	m := map[string]interface{}{"address": address}
 
 	payload, err := json.Marshal(m)
 	if err != nil {
@@ -309,6 +315,19 @@ func (gossiper *Gossiper) NewTxHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = gossiper.createTx(valueInt, to)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func (gossiper *Gossiper) NewTibcoinNode(w http.ResponseWriter, r *http.Request) {
+	// Get input
+	prefix := r.FormValue("prefix")
+	gossiper.errLogger.Printf("Prefix: %s\n", prefix)
+
+	err := gossiper.createTibcoinNode(prefix)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 	} else {

@@ -2,8 +2,6 @@ package gossipernode
 
 import (
 	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"fmt"
 	"log"
 	"net"
@@ -78,6 +76,7 @@ type Gossiper struct {
 	matches                []*FileSearchState
 	recentRequestsMutex    *sync.Mutex
 	recentReceivedRequests []*ReceivedSearchRequest
+	tibcoin 			   bool
 	privateKey             *ecdsa.PrivateKey
 	publicKey              *PublicKey
 	topBlock               [32]byte
@@ -98,9 +97,13 @@ type Gossiper struct {
 	orphanTxPoolMutex      *sync.Mutex
 	resetBlock             bool
 	resetBlockMutex        *sync.Mutex
+	createNodeMutex		   *sync.Mutex
+	blockRequestChannel	   chan *GossiperPacketSender
+	blockReplyChannel	   chan *GossiperPacketSender
+	transactionChannel	   chan *GossiperPacketSender
 }
 
-func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDPAddr, peersAddr []*net.UDPAddr, rtimer *time.Duration, noforward bool) (*Gossiper, error) {
+func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDPAddr, peersAddr []*net.UDPAddr, rtimer *time.Duration, noforward bool, tibcoin bool) (*Gossiper, error) {
 	stdLogger := log.New(os.Stdout, "", 0)
 	errLogger := log.New(os.Stderr, fmt.Sprintf("[Gossiper: %s] ", name), log.Ltime|log.Lshortfile)
 
@@ -125,13 +128,14 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 	}
 
 	// Generate public/private key pair
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return nil, err
-	}
-	publicKey := &PublicKey{
-		X: privateKey.PublicKey.X,
-		Y: privateKey.PublicKey.Y,
+	var privateKey *ecdsa.PrivateKey = nil
+	var publicKey *PublicKey = nil
+	if tibcoin {
+		// By default, don't care about a prefix for address
+		privateKey, publicKey, err = GeneratePrivateAndPublicKeys("")
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Init block chain
@@ -169,6 +173,7 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 		recentRequestsMutex:    &sync.Mutex{},
 		recentReceivedRequests: make([]*ReceivedSearchRequest, 0, 0),
 		matchesMutex:           &sync.Mutex{},
+		tibcoin:				tibcoin,
 		privateKey:             privateKey,
 		publicKey:              publicKey,
 		topBlock:               genesisHash,
@@ -189,6 +194,10 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 		peerNumRequestMutex:    &sync.Mutex{},
 		resetBlock:             true, // Start mining directly
 		resetBlockMutex:        &sync.Mutex{},
+		createNodeMutex:		&sync.Mutex{},
+		blockRequestChannel:	make(chan *GossiperPacketSender),
+		blockReplyChannel:		make(chan *GossiperPacketSender),
+		transactionChannel:		make(chan *GossiperPacketSender),
 	}, nil
 }
 
@@ -202,9 +211,6 @@ func (gossiper *Gossiper) Start() error {
 	dataReplyChannel := make(chan *GossiperPacketSender)
 	searchRequestChannel := make(chan *GossiperPacketSender)
 	searchReplyChannel := make(chan *GossiperPacketSender)
-	blockRequestChannel := make(chan *GossiperPacketSender)
-	blockReplyChannel := make(chan *GossiperPacketSender)
-	transactionChannel := make(chan *GossiperPacketSender)
 
 	// Launch webserver
 	go gossiper.LaunchWebServer()
@@ -214,7 +220,7 @@ func (gossiper *Gossiper) Start() error {
 	go gossiper.Listen(gossiper.gossipConn, gossipChannel)
 
 	// Spawn handler
-	go gossiper.GossiperRoutine(gossipChannel, rumorChannel, statusChannel, privateChannel, dataRequestChannel, dataReplyChannel, searchRequestChannel, searchReplyChannel, blockRequestChannel, blockReplyChannel, transactionChannel)
+	go gossiper.GossiperRoutine(gossipChannel, rumorChannel, statusChannel, privateChannel, dataRequestChannel, dataReplyChannel, searchRequestChannel, searchReplyChannel, gossiper.blockRequestChannel, gossiper.blockReplyChannel, gossiper.transactionChannel)
 	go gossiper.CLIRoutine(clientChannel)
 	go gossiper.RumorRoutine(rumorChannel)
 	go gossiper.StatusRoutine(statusChannel)
@@ -224,22 +230,16 @@ func (gossiper *Gossiper) Start() error {
 	go gossiper.SearchRequestRoutine(searchRequestChannel)
 	go gossiper.SearchReplyRoutine(searchReplyChannel)
 
-	go gossiper.blockRequestRoutine(blockRequestChannel)
-	go gossiper.blockReplyRoutine(blockReplyChannel)
-	go gossiper.TxRoutine(transactionChannel)
-	go gossiper.getInventoryRoutine()
-
 	// Spawn anti-antropy
 	go gossiper.AntiEntropyRoutine()
 
 	// Spawn route rumoring routine
 	go gossiper.RouteRumoringRoutine()
 
-	// Miner
-	go gossiper.Mine()
-
-	add := PublicKeyToAddress(gossiper.publicKey)
-	gossiper.errLogger.Printf("Tibcoin address %s\n", add)
+	// Launch tibcoin-related routines if wanted
+	if gossiper.tibcoin {
+		gossiper.StartTibcoinRoutines()
+	}
 
 	// TODO: remove
 
@@ -291,6 +291,14 @@ func (gossiper *Gossiper) Listen(conn *net.UDPConn, channel chan<- *Packet) {
 	}
 }
 
+func (gossiper *Gossiper) StartTibcoinRoutines() {
+	go gossiper.blockRequestRoutine(gossiper.blockRequestChannel)
+	go gossiper.blockReplyRoutine(gossiper.blockReplyChannel)
+	go gossiper.TxRoutine(gossiper.transactionChannel)
+	go gossiper.getInventoryRoutine()
+	go gossiper.Mine()
+}
+
 // --------------------------------- Helpers -------------------------------- //
 
 func (gossiper *Gossiper) getID() uint32 {
@@ -306,6 +314,10 @@ func (gossiper *Gossiper) getHistory(peerID string) *PeerHistory {
 	}
 
 	return history
+}
+
+func (gossiper *Gossiper) isTibcoinNode() bool {
+	return gossiper.privateKey != nil && gossiper.publicKey != nil
 }
 
 func KillTimeout(timeout *Timeout) {

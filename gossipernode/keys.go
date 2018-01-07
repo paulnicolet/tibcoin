@@ -1,13 +1,21 @@
 package gossipernode
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/sha256"
-	"encoding/hex"
+	"errors"
+	"fmt"
 	"math/big"
+	"regexp"
+	"strings"
 
 	"github.com/btcsuite/btcutil/base58"
 	"golang.org/x/crypto/ripemd160"
 )
+
+const MaxLengthPrefixAddress = 5
 
 type PublicKey struct {
 	// Curve is P256
@@ -30,21 +38,51 @@ type SerializedSig struct {
 	S []byte
 }
 
+func GeneratePrivateAndPublicKeys(addrPrefix string) (*ecdsa.PrivateKey, *PublicKey, error) {
+	if len(addrPrefix) > MaxLengthPrefixAddress {
+		return nil, nil, errors.New(fmt.Sprintf("The prefix requested is too long, it will take too much time to find an address. Max. size is: %d", MaxLengthPrefixAddress))
+	}
+
+	r, _ := regexp.Compile("^[a-zA-Z0-9]+$")
+
+	if len(addrPrefix) > 0 && (!r.MatchString(addrPrefix) || strings.Index(addrPrefix, "0") != -1 || strings.Index(addrPrefix, "O") != -1 || strings.Index(addrPrefix, "I") != -1 || strings.Index(addrPrefix, "l") != -1) {
+		return nil, nil, errors.New(fmt.Sprintf("The prefix should contain only alpha-numeric characters and cannot contain any '0', 'O', 'I' nor 'l'; prefix = %s", addrPrefix))
+	}
+
+	fmt.Println("Looking for an address...")
+
+	// TODO: Add a timer to stop after some time?
+	for true {
+		privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		publicKey := &PublicKey{
+			X: privateKey.PublicKey.X,
+			Y: privateKey.PublicKey.Y,
+		}
+
+		address := PublicKeyToAddress(publicKey)
+		if strings.Index(address, "1" + addrPrefix) == 0 {
+			fmt.Printf("Address found: %s\n", address)
+			return privateKey, publicKey, nil
+		}
+	}
+
+	return nil, nil, errors.New("Exited loop to find address matching prefix; should never happend")
+}
+
 // Public keys
 func PublicKeyToAddress(public *PublicKey) string {
-	prefix, _ := hex.DecodeString("04")
 	key := append(public.X.Bytes(), public.Y.Bytes()...)
-	payload := append(prefix, key...)
+	payload := append([]byte{0x04}, key...)
 
 	ripemHash := ripemd160.New()
 	sha := sha256.Sum256(payload)
 	ripemHash.Write(sha[:])
-	pubKeyHash := append([]byte{0}, ripemHash.Sum(nil)...)
 
-	shaSum1 := sha256.Sum256(pubKeyHash)
-	checkSum := sha256.Sum256(shaSum1[:])
-
-	address := base58.CheckEncode(append(pubKeyHash, checkSum[:4]...), byte(0))
+	address := base58.CheckEncode(ripemHash.Sum(nil), 0x00)
 	return address
 }
 

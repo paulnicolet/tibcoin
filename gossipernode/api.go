@@ -2,7 +2,11 @@ package gossipernode
 
 import (
 	"encoding/hex"
+	"errors"
+	"fmt"
 	"net"
+	"regexp"
+	"strings"
 	"time"
 )
 
@@ -150,6 +154,45 @@ func (gossiper *Gossiper) shareFile(filename string) error {
 	gossiper.filesMutex.Lock()
 	gossiper.files[file.Name] = file
 	gossiper.filesMutex.Unlock()
+
+	return nil
+}
+
+// Return address
+func (gossiper *Gossiper) createTibcoinNode(addrPrefix string) error {
+	if gossiper.isTibcoinNode() {
+		return errors.New(fmt.Sprintf("You already have a key pair and an address; address = %s", PublicKeyToAddress(gossiper.publicKey)))
+	}
+
+	if len(addrPrefix) > MaxLengthPrefixAddress {
+		return errors.New(fmt.Sprintf("The prefix requested is too long, it will take too much time to find an address. Max. size is: %d", MaxLengthPrefixAddress))
+	}
+
+	r, _ := regexp.Compile("^[a-zA-Z0-9]+$")
+
+	if len(addrPrefix) > 0 && (!r.MatchString(addrPrefix) || strings.Index(addrPrefix, "0") != -1 || strings.Index(addrPrefix, "O") != -1 || strings.Index(addrPrefix, "I") != -1 || strings.Index(addrPrefix, "l") != -1) {
+		return errors.New(fmt.Sprintf("The prefix should contain only alpha-numeric characters and cannot contain any '0', 'O', 'I' nor 'l'; prefix = %s", addrPrefix))
+	}
+
+	go func(){
+		gossiper.createNodeMutex.Lock()
+
+		if !gossiper.isTibcoinNode() {
+
+			privateKey, publicKey, err := GeneratePrivateAndPublicKeys(addrPrefix)
+			if err != nil {
+				panic(err)
+			}
+
+			gossiper.privateKey = privateKey
+			gossiper.publicKey = publicKey
+
+			// Start the routines
+			gossiper.StartTibcoinRoutines()
+		}
+
+		gossiper.createNodeMutex.Unlock()
+	}()
 
 	return nil
 }

@@ -320,6 +320,10 @@ func (gossiper *Gossiper) FilterSpentOutputs(outputs []*TxOutputLocation) []*TxO
 }
 
 func (gossiper *Gossiper) CollectOutputs() []*TxOutputLocation {
+	if !gossiper.isTibcoinNode() {
+		return make([]*TxOutputLocation, 0)
+	}
+
 	address := PublicKeyToAddress(gossiper.publicKey)
 	var outputs []*TxOutputLocation
 

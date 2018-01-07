@@ -1,5 +1,7 @@
+const ADDRESS_UPDATE_INTERVAL = 10 * 1000
 const BLOCKS_UPDATE_INTERVAL = 5 * 1000
 const BALANCE_UPDATE_INTERVAL = 6 * 1000
+const MAX_PREFIX_SIZE = 5
 
 var blockchain = {}
 
@@ -13,12 +15,38 @@ $(document).ready(() => {
 		}
     });
 
+    $('#new-node-form').submit(e => {
+        e.preventDefault();
+        if (validatePrefixAddr()) {
+            createTibcoinNode();
+        } else {
+            window.alert("Cannot have a prefix longer than " + MAX_PREFIX_SIZE + ", should contain only alpha-numeric characters and cannot have a prefix containing '0', 'O', 'I' nor 'l'.");
+        }
+    });
+
     updateBlocks();
     getAddress();
     updateBalance();
+    setInterval(getAddress, ADDRESS_UPDATE_INTERVAL)
     setInterval(updateBlocks, BLOCKS_UPDATE_INTERVAL);
     setInterval(updateBalance, BALANCE_UPDATE_INTERVAL);
 });
+
+function createTibcoinNode() {
+    $.ajax({
+        type: "POST",
+        url: "/tibcoin-node",
+        data: $("#new-node-form").serialize(),
+    })
+    .fail(function() {
+        UIkit.notification('Something went wrong when trying to create the node (node already created?), check the logs.', {status: 'danger', pos: 'top-right'});
+    })
+    .done(function() {
+        $('#prefix-input').val("");
+        $('#create-node-div').hide();
+        UIkit.notification('Your address is being generated...', {status: 'success', pos: 'top-right'});
+    });
+}
 
 function getAddress() {
     $.ajax({
@@ -28,8 +56,14 @@ function getAddress() {
     .fail(function() {
         console.log('Could not update address')
     })
-    .done(function(data) {        
-        $('#address').html(JSON.parse(data)["address"])
+    .done(function(data) {
+        if (JSON.parse(data)["address"] === undefined || JSON.parse(data)["address"].length == 0) {
+            $('#address').html("[Not generated yet]");
+        }
+        else {
+            $('#address').html(JSON.parse(data)["address"]);
+            $('#create-node-div').hide();
+        }
 	});
 }
 
@@ -136,9 +170,13 @@ function submitTx() {
 	});
 }
 
-
 function validateTxInput() {
     return ($('#to-input').val() != "" 
             && $('#value-input').val() != "" 
             && !isNaN(parseInt($('#value-input').val(), 10)))
+}
+
+function validatePrefixAddr() {
+    prefix = $('#prefix-input').val();
+    return prefix.length == 0 || (prefix.length <= MAX_PREFIX_SIZE && /^[a-zA-Z0-9]+$/.test(prefix) && prefix.indexOf('0') === -1 && prefix.indexOf('O') === -1 && prefix.indexOf('I') === -1 && prefix.indexOf('l') === -1);
 }
