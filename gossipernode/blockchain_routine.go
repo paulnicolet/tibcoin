@@ -304,7 +304,7 @@ func (gossiper *Gossiper) handleBlockRequest(blockRequestPacket *GossiperPacketS
 		// if yes
 		if containsBlock {
 
-			gossiper.errLogger.Printf("[bc_rout]: block requested, sending to %x, from %s", request.BlockHash[:], from.String())
+			gossiper.errLogger.Printf("[bc_rout]: block requested  %x, from %s", request.BlockHash[:], from.String())
 
 			return gossiper.sendBlockTo(block, from)
 
@@ -358,11 +358,10 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 	reply := blockReplyPacket.packet.BlockReply
 	from := blockReplyPacket.from
 
-	gossiper.errLogger.Printf("Received new block from %s", from.String())
-
 	// check if we got a block or inventory
 	// first the block
 	if reply.Block != nil {
+		gossiper.errLogger.Printf("Received new block from %s, with hash %x", from.String(), reply.Hash[:])
 
 		// Check that the block wasn't corrupted by UDP
 		block, err := reply.Block.toNormal()
@@ -379,6 +378,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 		return nil
 	} else {
 		// we got an inventory
+		gossiper.errLogger.Printf("Received new inventory from %s", from.String())
 
 		// first check not corrupted by UDP
 		concatHash := make([]byte, 0)
