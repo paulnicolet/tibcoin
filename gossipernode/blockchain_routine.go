@@ -21,7 +21,7 @@ func (gossiper *Gossiper) getInventoryRoutine() {
 
 	// we enter in the game, let's udpate
 	tmp := GenesisBlock.hash()
-	gossiper.getInventory(tmp)
+	gossiper.getInventory(tmp, nil)
 
 	// every predefined time, you request to all your neighboor their top block to
 	// see if you are behind
@@ -31,12 +31,12 @@ func (gossiper *Gossiper) getInventoryRoutine() {
 		currentTopBlock := gossiper.topBlock
 		gossiper.topBlockMutex.Unlock()
 
-		gossiper.getInventory(currentTopBlock)
+		gossiper.getInventory(currentTopBlock, nil)
 
 	}
 }
 
-func (gossiper *Gossiper) getInventory(topBlockHash [32]byte) {
+func (gossiper *Gossiper) getInventory(topBlockHash [32]byte, to *net.UDPAddr) {
 
 	gossiper.blocksMutex.Lock()
 	currentHeight := gossiper.blocks[topBlockHash].Height
@@ -56,9 +56,16 @@ func (gossiper *Gossiper) getInventory(topBlockHash [32]byte) {
 		gossiper.errLogger.Printf("Error in getInventory: %v", err)
 	}
 
-	// request the neighboor
-	for _, peer := range gossiper.peers {
-		_, err = gossiper.gossipConn.WriteToUDP(buffer, peer.addr)
+	if to == nil {
+		// request the neighboor
+		for _, peer := range gossiper.peers {
+			_, err = gossiper.gossipConn.WriteToUDP(buffer, peer.addr)
+			if err != nil {
+				gossiper.errLogger.Printf("Error in getInventory: %v", err)
+			}
+		}
+	} else {
+		_, err = gossiper.gossipConn.WriteToUDP(buffer, to)
 		if err != nil {
 			gossiper.errLogger.Printf("Error in getInventory: %v", err)
 		}
@@ -138,7 +145,7 @@ func (gossiper *Gossiper) requestBlocksFromInventory(inventory [][32]byte, from 
 	// a good block for our neighboor to send us the rest of the bc
 	if !atLeastOneUnknownBlock && len(inventory) > 0 {
 		// let's send the highest block from the inventory we just got
-		gossiper.getInventory(inventory[len(inventory)-1])
+		gossiper.getInventory(inventory[len(inventory)-1], from)
 	}
 }
 
