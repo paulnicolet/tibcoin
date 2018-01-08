@@ -19,6 +19,10 @@ const DIFF_TO_DELETE_ORPHAN = 10
 
 func (gossiper *Gossiper) getInventoryRoutine() {
 
+	// we enter in the game, let's udpate
+	tmp := GenesisBlock.hash()
+	gossiper.getInventory(tmp)
+
 	// every predefined time, you request to all your neighboor their top block to
 	// see if you are behind
 	for range time.NewTicker(time.Second * REQUEST_INVENTORY_WAIT).C {
@@ -27,28 +31,32 @@ func (gossiper *Gossiper) getInventoryRoutine() {
 		currentTopBlock := gossiper.topBlock
 		gossiper.topBlockMutex.Unlock()
 
-		packet := &GossipPacket{
-			BlockRequest: &BlockRequest{
-				Origin:     gossiper.name,
-				BlockHash:  currentTopBlock,
-				WaitingInv: true,
-			},
-		}
+		gossiper.getInventory(currentTopBlock)
 
-		buffer, err := protobuf.Encode(packet)
+		gossiper.errLogger.Printf("[bc_rout]: request inventory from neighboor(s)")
+	}
+}
+
+func (gossiper *Gossiper) getInventory(topBlockHash [32]byte) {
+	packet := &GossipPacket{
+		BlockRequest: &BlockRequest{
+			Origin:     gossiper.name,
+			BlockHash:  topBlockHash,
+			WaitingInv: true,
+		},
+	}
+
+	buffer, err := protobuf.Encode(packet)
+	if err != nil {
+		gossiper.errLogger.Printf("Error in getInventory: %v", err)
+	}
+
+	// request the neighboor
+	for _, peer := range gossiper.peers {
+		_, err = gossiper.gossipConn.WriteToUDP(buffer, peer.addr)
 		if err != nil {
 			gossiper.errLogger.Printf("Error in getInventory: %v", err)
 		}
-
-		// request the neighboor
-		for _, peer := range gossiper.peers {
-			_, err = gossiper.gossipConn.WriteToUDP(buffer, peer.addr)
-			if err != nil {
-				gossiper.errLogger.Printf("Error in getInventory: %v", err)
-			}
-		}
-
-		gossiper.errLogger.Printf("[bc_rout]: request inventory from neighboor(s)")
 	}
 }
 
@@ -66,6 +74,7 @@ func (gossiper *Gossiper) requestBlocksFromInventory(inventory [][32]byte, from 
 
 	gossiper.errLogger.Printf("[bc_rout]: requesting block(s) from inventory of %s", from.String())
 
+	requestedAtLeastOne := false
 	for _, hash := range inventory {
 
 		//check if I already have the block
@@ -75,6 +84,9 @@ func (gossiper *Gossiper) requestBlocksFromInventory(inventory [][32]byte, from 
 
 		// if it is not the case, time to work for this block
 		if !containsBlock {
+
+			// we have to work for at least one block
+			requestedAtLeastOne = true
 
 			// check if we have already an ongoing request for this block
 			gossiper.blockInRequestMutex.Lock()
@@ -112,6 +124,13 @@ func (gossiper *Gossiper) requestBlocksFromInventory(inventory [][32]byte, from 
 				gossiper.errLogger.Printf("[bc_rout]: created requester for block %x", hash[:])
 			}
 		}
+	}
+
+	// it means we are currently on a fork, and we don't send
+	// a good block for our neighboor to send us the rest of the bc
+	if !requestedAtLeastOne && len(inventory) > 0 {
+		// let's send the highest block from the inventory we just got
+		gossiper.getInventory(inventory[len(inventory)-1])
 	}
 }
 
