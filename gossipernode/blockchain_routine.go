@@ -269,14 +269,16 @@ func (gossiper *Gossiper) handleBlockRequest(blockRequestPacket *GossiperPacketS
 					<-blocksHashChan
 				}
 
-				// add the new element to the queue
-				blocksHashChan <- currentBlockHash.PrevHash
-				counter++
+				tmp := currentBlockHash.PrevHash
 
 				// go the to the next block
 				gossiper.blocksMutex.Lock()
 				currentBlockHash = gossiper.blocks[currentBlockHash.PrevHash]
 				gossiper.blocksMutex.Unlock()
+
+				// add the new element to the queue
+				blocksHashChan <- tmp
+				counter++
 
 			}
 
