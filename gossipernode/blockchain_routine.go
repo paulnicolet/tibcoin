@@ -14,8 +14,7 @@ import (
 const INVENTORY_SIZE = 10
 const REQUEST_INVENTORY_WAIT = 15
 const REQUEST_BLOCK_WAIT = 5
-const MAX_REQUEST = 3
-const DIFF_TO_DELETE_ORPHAN = 10
+const MAX_REQUEST_PER_PEER = 3
 
 func (gossiper *Gossiper) getInventoryRoutine() {
 
@@ -65,6 +64,7 @@ func (gossiper *Gossiper) getInventory(topBlockHash [32]byte, to *net.UDPAddr) {
 			}
 		}
 	} else {
+		// request only one neighboor
 		_, err = gossiper.gossipConn.WriteToUDP(buffer, to)
 		if err != nil {
 			gossiper.errLogger.Printf("Error in getInventory: %v", err)
@@ -208,7 +208,7 @@ func (gossiper *Gossiper) requestBlock(blockHash [32]byte) {
 
 				currentRequestedPeer = l[currentIdx%len(l)]
 
-				if gossiper.peerNumRequest[currentRequestedPeer.String()] >= MAX_REQUEST {
+				if gossiper.peerNumRequest[currentRequestedPeer.String()] >= MAX_REQUEST_PER_PEER {
 					currentRequestedPeer = nil
 				}
 				currentIdx++
@@ -264,8 +264,6 @@ func (gossiper *Gossiper) handleBlockRequest(blockRequestPacket *GossiperPacketS
 		topBlockHeight := gossiper.blocks[gossiper.topBlock].Height
 		gossiper.blocksMutex.Unlock()
 		gossiper.topBlockMutex.Unlock()
-
-		gossiper.errLogger.Printf("Inventory requested, our top = %d, the requester top = %d", topBlockHeight, request.CurrentHeight)
 
 		// check if we have something to learn to the requester
 		if topBlockHeight >= request.CurrentHeight {
