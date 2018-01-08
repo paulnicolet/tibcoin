@@ -11,10 +11,10 @@ import (
 	"github.com/dedis/protobuf"
 )
 
-const INVENTORY_SIZE = 10
+const INVENTORY_SIZE = 50
 const REQUEST_INVENTORY_WAIT = 15
 const REQUEST_BLOCK_WAIT = 5
-const MAX_REQUEST_PER_PEER = 3
+const MAX_REQUEST_PER_PEER = 10
 
 func (gossiper *Gossiper) getInventoryRoutine() {
 
