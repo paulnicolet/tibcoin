@@ -47,7 +47,7 @@ func (gossiper *Gossiper) getInventory(topBlockHash [32]byte, to *net.UDPAddr) {
 			Origin:        gossiper.name,
 			BlockHash:     topBlockHash,
 			WaitingInv:    true,
-			currentHeight: currentHeight,
+			CurrentHeight: currentHeight,
 		},
 	}
 

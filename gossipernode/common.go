@@ -81,7 +81,7 @@ type BlockRequest struct {
 	Origin        string
 	BlockHash     [32]byte
 	WaitingInv    bool
-	currentHeight uint32
+	CurrentHeight uint32
 }
 
 type BlockReply struct {
