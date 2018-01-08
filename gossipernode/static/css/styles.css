@@ -5,3 +5,7 @@
 .uk-navbar-nav>li>a {
     color: white !important;
 }
+
+.hash {
+    font-size: 12px;
+}

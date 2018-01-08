@@ -183,7 +183,7 @@ func (gossiper *Gossiper) createTibcoinNode(addrPrefix string, miner bool) error
 	}
 	gossiper.isMinerMutex.Unlock()
 
-	go func(){
+	go func() {
 		gossiper.createNodeMutex.Lock()
 
 		if !gossiper.isTibcoinNode() {
@@ -244,20 +244,26 @@ func (gossiper *Gossiper) isMinerNodeAPI() bool {
 }
 
 type BlockWithHash struct {
-	Hash      			string
-	Timestamp 			string
-	Height    			uint32
-	Nonce     			uint32
-	PrevHash  			string
-	TransactionsHash 	string
-	Target    			string
-	Txs       			[]*TxWithHash
+	Hash             string
+	Timestamp        string
+	Height           uint32
+	Nonce            uint32
+	PrevHash         string
+	TransactionsHash string
+	Target           string
+	Txs              []*TxWithHash
 }
 
 type TxWithHash struct {
-	Tx      *Tx
+	Inputs  []*InputWithHash
+	Outputs []*TxOutput
 	Hash    string
 	Address string
+}
+
+type InputWithHash struct {
+	OutputTxHash string
+	OutputIdx    int
 }
 
 func (gossiper *Gossiper) getBlockchain() []*BlockWithHash {
@@ -274,8 +280,18 @@ func (gossiper *Gossiper) getBlockchain() []*BlockWithHash {
 		var txs []*TxWithHash
 		for _, tx := range currentBlock.Txs {
 			txHash := tx.hash()
+
+			var inputs []*InputWithHash
+			for _, input := range tx.Inputs {
+				inputs = append(inputs, &InputWithHash{
+					OutputTxHash: hex.EncodeToString(input.OutputTxHash[:]),
+					OutputIdx:    input.OutputIdx,
+				})
+			}
+
 			txs = append(txs, &TxWithHash{
-				Tx:      tx,
+				Inputs:  inputs,
+				Outputs: tx.Outputs,
 				Hash:    hex.EncodeToString(txHash[:]),
 				Address: PublicKeyToAddress(tx.PublicKey),
 			})
@@ -283,14 +299,14 @@ func (gossiper *Gossiper) getBlockchain() []*BlockWithHash {
 
 		currentHash := currentBlock.hash()
 		blocks = append(blocks, &BlockWithHash{
-			Timestamp: 			time.Unix(currentBlock.Timestamp, 0).String(),
-			Hash:      			hex.EncodeToString(currentHash[:]),
-			Height:    			currentBlock.Height,
-			Nonce:     			currentBlock.Nonce,
-			PrevHash:  			hex.EncodeToString(currentBlock.PrevHash[:]),
-			TransactionsHash: 	hex.EncodeToString(currentBlock.TransactionsHash[:]),
-			Target:    			hex.EncodeToString(currentBlock.Target[:]),
-			Txs:       			txs,
+			Timestamp:        time.Unix(currentBlock.Timestamp, 0).String(),
+			Hash:             hex.EncodeToString(currentHash[:]),
+			Height:           currentBlock.Height,
+			Nonce:            currentBlock.Nonce,
+			PrevHash:         hex.EncodeToString(currentBlock.PrevHash[:]),
+			TransactionsHash: hex.EncodeToString(currentBlock.TransactionsHash[:]),
+			Target:           hex.EncodeToString(currentBlock.Target[:]),
+			Txs:              txs,
 		})
 		currentBlock, hasNextBlock = gossiper.blocks[currentBlock.PrevHash]
 	}

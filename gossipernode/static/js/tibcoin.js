@@ -189,13 +189,24 @@ function appendBlock(block) {
                 var txContent = $('<li>');
                 txContent.append($('<div>').html('<span class="uk-text-success">From:</span> ' + tx.Address).addClass('uk-text-meta'));
                 txContent.append($('<div>').html('<span class="uk-text-success">Hash:</span> ' + tx.Hash).addClass('uk-text-meta'));
+                
+                txContent.append($('<div>').html('Inputs').addClass('uk-text-meta uk-text-success'));
+                var inputs = $('<ul>').addClass('uk-list');
+                tx.Inputs.forEach(input => {
+                    inputs.append($('<li>').html('Index ' + input.OutputIdx + ' of tx <span class="hash">' + input.OutputTxHash + '</span>').addClass('uk-text-meta'));
+                });
+    
+                txContent.append(inputs);
+
+
                 txContent.append($('<div>').html('Outputs').addClass('uk-text-meta uk-text-success'));
                 var outputs = $('<ul>').addClass('uk-list');
-                tx.Tx.Outputs.forEach(output => {
+                tx.Outputs.forEach(output => {
                     outputs.append($('<li>').html(output.Value + ' tibcoins to ' + output.To).addClass('uk-text-meta'));
                 });
     
                 txContent.append(outputs);
+
                 txDetails.append(txContent);
             });
         }
