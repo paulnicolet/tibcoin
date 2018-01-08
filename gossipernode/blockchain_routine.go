@@ -258,6 +258,8 @@ func (gossiper *Gossiper) handleBlockRequest(blockRequestPacket *GossiperPacketS
 		gossiper.blocksMutex.Unlock()
 		gossiper.topBlockMutex.Unlock()
 
+		gossiper.errLogger.Printf("Inventory requested, our top = %d, the requester top = %d", topBlockHeight, request.currentHeight)
+
 		// check if we have something to learn to the requester
 		if topBlockHeight >= request.currentHeight {
 
