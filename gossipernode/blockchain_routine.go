@@ -33,16 +33,21 @@ func (gossiper *Gossiper) getInventoryRoutine() {
 
 		gossiper.getInventory(currentTopBlock)
 
-		gossiper.errLogger.Printf("[bc_rout]: request inventory from neighboor(s)")
 	}
 }
 
 func (gossiper *Gossiper) getInventory(topBlockHash [32]byte) {
+
+	gossiper.blocksMutex.Lock()
+	currentHeight := gossiper.blocks[topBlockHash].Height
+	gossiper.blocksMutex.Unlock()
+
 	packet := &GossipPacket{
 		BlockRequest: &BlockRequest{
-			Origin:     gossiper.name,
-			BlockHash:  topBlockHash,
-			WaitingInv: true,
+			Origin:        gossiper.name,
+			BlockHash:     topBlockHash,
+			WaitingInv:    true,
+			currentHeight: currentHeight,
 		},
 	}
 
@@ -58,6 +63,9 @@ func (gossiper *Gossiper) getInventory(topBlockHash [32]byte) {
 			gossiper.errLogger.Printf("Error in getInventory: %v", err)
 		}
 	}
+
+	gossiper.errLogger.Printf("[bc_rout]: request inventory from neighboor(s), with top %x", topBlockHash[:])
+
 }
 
 func addrInList(l []*net.UDPAddr, e *net.UDPAddr) bool {
@@ -74,7 +82,7 @@ func (gossiper *Gossiper) requestBlocksFromInventory(inventory [][32]byte, from 
 
 	gossiper.errLogger.Printf("[bc_rout]: requesting block(s) from inventory of %s", from.String())
 
-	requestedAtLeastOne := false
+	atLeastOneUnknownBlock := false
 	for _, hash := range inventory {
 
 		//check if I already have the block
@@ -86,7 +94,7 @@ func (gossiper *Gossiper) requestBlocksFromInventory(inventory [][32]byte, from 
 		if !containsBlock {
 
 			// we have to work for at least one block
-			requestedAtLeastOne = true
+			atLeastOneUnknownBlock = true
 
 			// check if we have already an ongoing request for this block
 			gossiper.blockInRequestMutex.Lock()
@@ -128,7 +136,7 @@ func (gossiper *Gossiper) requestBlocksFromInventory(inventory [][32]byte, from 
 
 	// it means we are currently on a fork, and we don't send
 	// a good block for our neighboor to send us the rest of the bc
-	if !requestedAtLeastOne && len(inventory) > 0 {
+	if !atLeastOneUnknownBlock && len(inventory) > 0 {
 		// let's send the highest block from the inventory we just got
 		gossiper.getInventory(inventory[len(inventory)-1])
 	}
@@ -245,72 +253,84 @@ func (gossiper *Gossiper) handleBlockRequest(blockRequestPacket *GossiperPacketS
 	if request.WaitingInv {
 
 		gossiper.topBlockMutex.Lock()
-		currentTopBlockHash := gossiper.topBlock
+		gossiper.blocksMutex.Lock()
+		topBlockHeight := gossiper.blocks[gossiper.topBlock].Height
+		gossiper.blocksMutex.Unlock()
 		gossiper.topBlockMutex.Unlock()
 
-		// check that we have different top block
-		if !bytes.Equal(currentTopBlockHash[:], request.BlockHash[:]) {
+		// check if we have something to learn to the requester
+		if topBlockHeight >= request.currentHeight {
 
-			// the fifo queue that we will send
-			blocksHashChan := make(chan [32]byte, INVENTORY_SIZE)
-			blocksHashChan <- currentTopBlockHash
-			counter := 1
+			gossiper.topBlockMutex.Lock()
+			currentTopBlockHash := gossiper.topBlock
+			gossiper.topBlockMutex.Unlock()
 
-			gossiper.blocksMutex.Lock()
-			currentBlockHash := gossiper.blocks[currentTopBlockHash]
-			gossiper.blocksMutex.Unlock()
+			// check that we have different top block
+			if !bytes.Equal(currentTopBlockHash[:], request.BlockHash[:]) {
 
-			// loop until we find the requested block, or we reach the genesis block
-			for !bytes.Equal(NilHash[:], currentBlockHash.PrevHash[:]) && !bytes.Equal(currentBlockHash.PrevHash[:], request.BlockHash[:]) {
+				// the fifo queue that we will send
+				blocksHashChan := make(chan [32]byte, INVENTORY_SIZE)
+				blocksHashChan <- currentTopBlockHash
+				counter := 1
 
-				// if fifo full, remove the first entered one
-				if counter == INVENTORY_SIZE {
-					counter--
-					<-blocksHashChan
-				}
-
-				tmp := currentBlockHash.PrevHash
-
-				// go the to the next block
 				gossiper.blocksMutex.Lock()
-				currentBlockHash = gossiper.blocks[currentBlockHash.PrevHash]
+				currentBlockHash := gossiper.blocks[currentTopBlockHash]
 				gossiper.blocksMutex.Unlock()
 
-				// add the new element to the queue
-				blocksHashChan <- tmp
-				counter++
+				// loop until we find the requested block, or we reach the genesis block
+				for !bytes.Equal(NilHash[:], currentBlockHash.PrevHash[:]) && !bytes.Equal(currentBlockHash.PrevHash[:], request.BlockHash[:]) {
 
-			}
+					// if fifo full, remove the first entered one
+					if counter == INVENTORY_SIZE {
+						counter--
+						<-blocksHashChan
+					}
 
-			// a channel isn't a slice, thus we need to transform it
-			blocksHash := make([][32]byte, counter)
-			concatHash := make([]byte, 0)
-			for i := 0; i < counter; i++ {
-				blocksHash[i] = <-blocksHashChan
-				concatHash = append(concatHash, blocksHash[i][:]...)
-			}
+					tmp := currentBlockHash.PrevHash
 
-			gossiper.errLogger.Printf("[bc_rout]: inventory requested, sending to %s, size send = %d", from.String(), counter)
+					// go the to the next block
+					gossiper.blocksMutex.Lock()
+					currentBlockHash = gossiper.blocks[currentBlockHash.PrevHash]
+					gossiper.blocksMutex.Unlock()
 
-			// we are ready to send the inventory
-			packet := &GossipPacket{
-				BlockReply: &BlockReply{
-					Origin:     gossiper.name,
-					Hash:       sha256.Sum256(concatHash), // don't forget to verify the slice
-					BlocksHash: blocksHash,
-				},
-			}
+					// add the new element to the queue
+					blocksHashChan <- tmp
+					counter++
+				}
 
-			buffer, err := protobuf.Encode(packet)
-			if err != nil {
+				// a channel isn't a slice, thus we need to transform it
+				blocksHash := make([][32]byte, counter)
+				concatHash := make([]byte, 0)
+				for i := 0; i < counter; i++ {
+					blocksHash[i] = <-blocksHashChan
+					concatHash = append(concatHash, blocksHash[i][:]...)
+				}
+
+				gossiper.errLogger.Printf("[bc_rout]: inventory requested, sending to %s, size send = %d", from.String(), counter)
+
+				// we are ready to send the inventory
+				packet := &GossipPacket{
+					BlockReply: &BlockReply{
+						Origin:     gossiper.name,
+						Hash:       sha256.Sum256(concatHash), // don't forget to verify the slice
+						BlocksHash: blocksHash,
+					},
+				}
+
+				buffer, err := protobuf.Encode(packet)
+				if err != nil {
+					return err
+				}
+
+				_, err = gossiper.gossipConn.WriteToUDP(buffer, from)
 				return err
+
+			} else {
+				// same top block, nothing to send
+				return nil
 			}
-
-			_, err = gossiper.gossipConn.WriteToUDP(buffer, from)
-			return err
-
 		} else {
-			// same top block, nothing to send
+			// I have nothing to learn to the inventory requester, I'm behind
 			return nil
 		}
 

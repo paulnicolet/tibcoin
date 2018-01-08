@@ -78,9 +78,10 @@ type SearchResult struct {
 /* Block chain struct routine */
 
 type BlockRequest struct {
-	Origin     string
-	BlockHash  [32]byte
-	WaitingInv bool
+	Origin        string
+	BlockHash     [32]byte
+	WaitingInv    bool
+	currentHeight uint32
 }
 
 type BlockReply struct {
