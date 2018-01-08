@@ -250,33 +250,33 @@ func (gossiper *Gossiper) Start() error {
 	// TODO: remove
 
 	/*
-		// Create new block + hash
-		block := GenesisBlock
-		target := block.Target
-		var nonce uint32 = 0
+	// Create new block + hash
+	block := GenesisBlock
+	target := block.Target
+	var nonce uint32 = 0
 
-		for {
-			blockHash := block.hash()
+	for {
+		blockHash := block.hash()
 
-			// See if found new valid block
-			if bytes.Compare(blockHash[:], target[:]) < 0 {
-				// Found block!
-				fmt.Printf("[GENESIS] Found new block: %x with nonce = %d.\n", blockHash[:], nonce)
-				break
-			}
-
-			nonce++
-
-			block = &Block{
-				Timestamp: time.Date(2018, 1, 3, 11, 00, 00, 00, time.UTC).Unix(),
-				Height:    0,
-				Nonce:     nonce,
-				Target:    BytesToHash(InitialTarget),
-				PrevHash:  NilHash,
-				Txs:       make([]*Transaction, 0),
-			}
-
+		// See if found new valid block
+		if bytes.Compare(blockHash[:], target[:]) < 0 {
+			// Found block!
+			fmt.Printf("[GENESIS] Found new block: %x with nonce = %d.\n", blockHash[:], nonce)
+			break
 		}
+
+		nonce++
+
+		block = &Block{
+			Timestamp: 			time.Date(2018, 1, 3, 11, 00, 00, 00, time.UTC).Unix(),
+			Height:    			0,
+			Nonce:     			nonce,
+			Target:    			BytesToHash(InitialTarget),
+			TransactionsHash: 	NilHash,
+			PrevHash:  			NilHash,
+			Txs:       			make([]*Tx, 0),
+		}
+	}
 	*/
 
 	select {}

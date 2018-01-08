@@ -69,12 +69,13 @@ func (gossiper *Gossiper) Mine() {
 
 			// Create new block + hash
 			block = &Block{
-				Timestamp: time.Now().Unix(),
-				Height:    previousBlock.Height + 1,
-				Nonce:     nonce,
-				PrevHash:  prevHash,
-				Txs:       newTxs,
-				Target:    BytesToHash(InitialTarget),
+				Timestamp: 			time.Now().Unix(),
+				Height:    			previousBlock.Height + 1,
+				Nonce:     			nonce,
+				PrevHash:  			prevHash,
+				TransactionsHash:	hashTxs(newTxs),
+				Txs:       			newTxs,
+				Target:    			BytesToHash(InitialTarget),
 			}
 		}
 

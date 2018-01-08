@@ -36,6 +36,17 @@ func (tx *Tx) hash() [32]byte {
 	return BytesToHash(h.Sum(nil))
 }
 
+func hashTxs(txs []*Tx) [32]byte {
+	hash := sha256.New()
+
+	for _, tx := range txs {
+		txHash := tx.hash()
+		hash.Write(txHash[:])
+	}
+
+	return BytesToHash(hash.Sum(nil))
+}
+
 func (tx *Tx) getSignable() [32]byte {
 	h := sha256.New()
 

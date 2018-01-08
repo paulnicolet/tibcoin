@@ -244,13 +244,14 @@ func (gossiper *Gossiper) isMinerNodeAPI() bool {
 }
 
 type BlockWithHash struct {
-	Hash      string
-	Timestamp string
-	Height    uint32
-	Nonce     uint32
-	PrevHash  string
-	Target    string
-	Txs       []*TxWithHash
+	Hash      			string
+	Timestamp 			string
+	Height    			uint32
+	Nonce     			uint32
+	PrevHash  			string
+	TransactionsHash 	string
+	Target    			string
+	Txs       			[]*TxWithHash
 }
 
 type TxWithHash struct {
@@ -282,13 +283,14 @@ func (gossiper *Gossiper) getBlockchain() []*BlockWithHash {
 
 		currentHash := currentBlock.hash()
 		blocks = append(blocks, &BlockWithHash{
-			Timestamp: time.Unix(currentBlock.Timestamp, 0).String(),
-			Hash:      hex.EncodeToString(currentHash[:]),
-			Height:    currentBlock.Height,
-			Nonce:     currentBlock.Nonce,
-			PrevHash:  hex.EncodeToString(currentBlock.PrevHash[:]),
-			Target:    hex.EncodeToString(currentBlock.Target[:]),
-			Txs:       txs,
+			Timestamp: 			time.Unix(currentBlock.Timestamp, 0).String(),
+			Hash:      			hex.EncodeToString(currentHash[:]),
+			Height:    			currentBlock.Height,
+			Nonce:     			currentBlock.Nonce,
+			PrevHash:  			hex.EncodeToString(currentBlock.PrevHash[:]),
+			TransactionsHash: 	hex.EncodeToString(currentBlock.TransactionsHash[:]),
+			Target:    			hex.EncodeToString(currentBlock.Target[:]),
+			Txs:       			txs,
 		})
 		currentBlock, hasNextBlock = gossiper.blocks[currentBlock.PrevHash]
 	}

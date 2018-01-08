@@ -17,21 +17,23 @@ const MaxSecondsBlockInFuture = 2 * 3600 // 2 hours
 const NbBlocksToCheckForTime = 11        // must be odd
 
 type Block struct {
-	Timestamp int64
-	Height    uint32
-	Nonce     uint32
-	Target    [32]byte // TODO (maybe): Change into 4 bytes and use difficulty + change it over time
-	PrevHash  [32]byte
-	Txs       []*Tx
+	Timestamp 			int64
+	Height    			uint32
+	Nonce     			uint32
+	Target    			[32]byte // TODO (maybe): Change into 4 bytes and use difficulty + change it over time
+	TransactionsHash 	[32]byte
+	PrevHash  			[32]byte
+	Txs       			[]*Tx
 }
 
 type SerializableBlock struct {
-	Timestamp int64
-	Height    uint32
-	Nonce     uint32
-	Target    [32]byte
-	PrevHash  [32]byte
-	Txs       []*SerializableTx
+	Timestamp 			int64
+	Height    			uint32
+	Nonce     			uint32
+	Target    			[32]byte
+	TransactionsHash 	[32]byte
+	PrevHash  			[32]byte
+	Txs       			[]*SerializableTx
 }
 
 // Used for sorting []int64
@@ -47,15 +49,16 @@ var InitialTarget, _ = hex.DecodeString("00000F000000000000000000000000000000000
 
 // Nonce found in order to have a genesis block respecting initial target; should be recomputed
 // if anything about the genesis block is changed
-var GenesisNonce uint32 = 538367
+var GenesisNonce uint32 = 691835
 
 var GenesisBlock = &Block{
-	Timestamp: time.Date(2018, 1, 3, 11, 00, 00, 00, time.UTC).Unix(),
-	Height:    0,
-	Nonce:     GenesisNonce,
-	Target:    BytesToHash(InitialTarget),
-	PrevHash:  NilHash,
-	Txs:       make([]*Tx, 0),
+	Timestamp: 			time.Date(2018, 1, 3, 11, 00, 00, 00, time.UTC).Unix(),
+	Height:    			0,
+	Nonce:     			GenesisNonce,
+	Target:    			BytesToHash(InitialTarget),
+	TransactionsHash: 	NilHash,
+	PrevHash:  			NilHash,
+	Txs:       			make([]*Tx, 0),
 }
 
 // Inspired by: https://en.bitcoin.it/wiki/Protocol_rules#.22block.22_messages
@@ -561,11 +564,7 @@ func (block *Block) hash() [32]byte {
 	hash.Write([]byte(strconv.Itoa(int(block.Height))))
 	hash.Write([]byte(strconv.Itoa(int(block.Nonce))))
 	hash.Write(block.PrevHash[:])
-
-	for _, tx := range block.Txs {
-		txHash := tx.hash()
-		hash.Write(txHash[:])
-	}
+	hash.Write(block.TransactionsHash[:])
 
 	return BytesToHash(hash.Sum(nil))
 }
@@ -583,12 +582,13 @@ func (block *Block) toSerializable() (*SerializableBlock, error) {
 	}
 
 	return &SerializableBlock{
-		Timestamp: block.Timestamp,
-		Height:    block.Height,
-		Nonce:     block.Nonce,
-		Target:    block.Target,
-		PrevHash:  block.PrevHash,
-		Txs:       serTxs,
+		Timestamp: 			block.Timestamp,
+		Height:    			block.Height,
+		Nonce:     			block.Nonce,
+		Target:    			block.Target,
+		PrevHash:  			block.PrevHash,
+		TransactionsHash: 	block.TransactionsHash,
+		Txs:       			serTxs,
 	}, nil
 }
 
@@ -605,11 +605,12 @@ func (block *SerializableBlock) toNormal() (*Block, error) {
 	}
 
 	return &Block{
-		Timestamp: block.Timestamp,
-		Height:    block.Height,
-		Nonce:     block.Nonce,
-		Target:    block.Target,
-		PrevHash:  block.PrevHash,
-		Txs:       txs,
+		Timestamp: 			block.Timestamp,
+		Height:    			block.Height,
+		Nonce:     			block.Nonce,
+		Target:    			block.Target,
+		TransactionsHash: 	block.TransactionsHash,
+		PrevHash:  			block.PrevHash,
+		Txs:       			txs,
 	}, nil
 }
