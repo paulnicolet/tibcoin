@@ -167,6 +167,7 @@ function appendBlock(block) {
     body.append($('<li>').html('Height: ' + block.Height).addClass('uk-text-meta'));
     body.append($('<li>').html('Nonce: ' + block.Nonce).addClass('uk-text-meta'));
     body.append($('<li>').html('Previous block: ' + block.PrevHash).addClass('uk-text-meta'));
+    body.append($('<li>').html('Transactions hash: ' + block.TransactionsHash).addClass('uk-text-meta'));
     body.append($('<li>').html('Target: ' + block.Target).addClass('uk-text-meta'));
 
     var txNb = 0
