@@ -79,6 +79,7 @@ type Gossiper struct {
 	tibcoin 			   bool
 	privateKey             *ecdsa.PrivateKey
 	publicKey              *PublicKey
+	keysMutex			   *sync.Mutex
 	topBlock               [32]byte
 	topBlockMutex          *sync.Mutex
 	blocks                 map[[32]byte]*Block
@@ -98,12 +99,14 @@ type Gossiper struct {
 	resetBlock             bool
 	resetBlockMutex        *sync.Mutex
 	createNodeMutex		   *sync.Mutex
+	isMiner				   bool
+	isMinerMutex		   *sync.Mutex
 	blockRequestChannel	   chan *GossiperPacketSender
 	blockReplyChannel	   chan *GossiperPacketSender
 	transactionChannel	   chan *GossiperPacketSender
 }
 
-func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDPAddr, peersAddr []*net.UDPAddr, rtimer *time.Duration, noforward bool, tibcoin bool) (*Gossiper, error) {
+func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDPAddr, peersAddr []*net.UDPAddr, rtimer *time.Duration, noforward bool, tibcoin bool, miner bool) (*Gossiper, error) {
 	stdLogger := log.New(os.Stdout, "", 0)
 	errLogger := log.New(os.Stderr, fmt.Sprintf("[Gossiper: %s] ", name), log.Ltime|log.Lshortfile)
 
@@ -176,6 +179,7 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 		tibcoin:				tibcoin,
 		privateKey:             privateKey,
 		publicKey:              publicKey,
+		keysMutex:				&sync.Mutex{},
 		topBlock:               genesisHash,
 		topBlockMutex:          &sync.Mutex{},
 		blocks:                 blocks,
@@ -195,6 +199,8 @@ func NewGossiper(name string, uiPort string, guiPort string, gossipAddr *net.UDP
 		resetBlock:             true, // Start mining directly
 		resetBlockMutex:        &sync.Mutex{},
 		createNodeMutex:		&sync.Mutex{},
+		isMiner:				miner,
+		isMinerMutex:			&sync.Mutex{},
 		blockRequestChannel:	make(chan *GossiperPacketSender),
 		blockReplyChannel:		make(chan *GossiperPacketSender),
 		transactionChannel:		make(chan *GossiperPacketSender),
@@ -238,7 +244,7 @@ func (gossiper *Gossiper) Start() error {
 
 	// Launch tibcoin-related routines if wanted
 	if gossiper.tibcoin {
-		gossiper.StartTibcoinRoutines()
+		gossiper.StartTibcoinRoutines(true)
 	}
 
 	// TODO: remove
@@ -291,12 +297,15 @@ func (gossiper *Gossiper) Listen(conn *net.UDPConn, channel chan<- *Packet) {
 	}
 }
 
-func (gossiper *Gossiper) StartTibcoinRoutines() {
+func (gossiper *Gossiper) StartTibcoinRoutines(miner bool) {
 	go gossiper.blockRequestRoutine(gossiper.blockRequestChannel)
 	go gossiper.blockReplyRoutine(gossiper.blockReplyChannel)
 	go gossiper.TxRoutine(gossiper.transactionChannel)
 	go gossiper.getInventoryRoutine()
-	go gossiper.Mine()
+
+	if miner {
+		go gossiper.Mine()
+	}
 }
 
 // --------------------------------- Helpers -------------------------------- //
@@ -317,7 +326,17 @@ func (gossiper *Gossiper) getHistory(peerID string) *PeerHistory {
 }
 
 func (gossiper *Gossiper) isTibcoinNode() bool {
-	return gossiper.privateKey != nil && gossiper.publicKey != nil
+	gossiper.keysMutex.Lock()
+	isTibcoinNode := gossiper.privateKey != nil && gossiper.publicKey != nil
+	gossiper.keysMutex.Unlock()
+	return isTibcoinNode
+}
+
+func (gossiper *Gossiper) isMinerNode() bool {
+	gossiper.isMinerMutex.Lock()
+	isMinerNode := gossiper.isMiner
+	gossiper.isMinerMutex.Unlock()
+	return isMinerNode
 }
 
 func KillTimeout(timeout *Timeout) {

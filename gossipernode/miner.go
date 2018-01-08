@@ -8,7 +8,7 @@ import (
 
 const BaseReward = 1000
 
-func (gossiper *Gossiper) Mine() (*Block, error) {
+func (gossiper *Gossiper) Mine() {
 	gossiper.errLogger.Println("Started mining node.")
 
 	// Mine until we find a block or we're told to start mining again
@@ -16,6 +16,12 @@ func (gossiper *Gossiper) Mine() (*Block, error) {
 	var block *Block
 
 	for {
+		// Stop if not mining anymore
+		miner := gossiper.isMinerNode()
+		if !miner {
+			break
+		}
+
 		gossiper.resetBlockMutex.Lock()
 		resetBlock := gossiper.resetBlock
 		gossiper.resetBlockMutex.Unlock()

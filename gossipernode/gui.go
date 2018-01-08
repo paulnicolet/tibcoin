@@ -23,6 +23,8 @@ func (gossiper *Gossiper) LaunchWebServer() {
 	r.HandleFunc("/download", gossiper.NewDownloadHandler).Methods("POST")
 	r.HandleFunc("/tx", gossiper.NewTxHandler).Methods("POST")
 	r.HandleFunc("/tibcoin-node", gossiper.NewTibcoinNode).Methods("POST")
+	r.HandleFunc("/miner-tibcoin-node", gossiper.NewMinerTibcoinNode).Methods("POST")
+	r.HandleFunc("/switch-mining-status", gossiper.SwitchMiningStatus).Methods("POST")
 
 	// GET
 	r.HandleFunc("/chat", gossiper.ChatHandler).Methods("GET")
@@ -34,6 +36,7 @@ func (gossiper *Gossiper) LaunchWebServer() {
 	r.HandleFunc("/blockchain", gossiper.GetBlockchainHandler).Methods("GET")
 	r.HandleFunc("/balance", gossiper.GetBalanceHandler).Methods("GET")
 	r.HandleFunc("/address", gossiper.GetAddressHandler).Methods("GET")
+	r.HandleFunc("/miner", gossiper.IsMinerNode).Methods("GET")
 
 	// Serve static files
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./gossipernode/static/")))
@@ -199,6 +202,20 @@ func (gossiper *Gossiper) GetAddressHandler(w http.ResponseWriter, r *http.Reque
 	w.Write(payload)
 }
 
+func (gossiper *Gossiper) IsMinerNode(w http.ResponseWriter, r *http.Request) {
+	miner := gossiper.isMinerNodeAPI()
+
+	m := map[string]interface{}{"miner": miner}
+
+	payload, err := json.Marshal(m)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(payload)
+}
+
 // --------------------------------- Inputs --------------------------------- //
 func (gossiper *Gossiper) NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 	// Get input
@@ -327,10 +344,28 @@ func (gossiper *Gossiper) NewTibcoinNode(w http.ResponseWriter, r *http.Request)
 	prefix := r.FormValue("prefix")
 	gossiper.errLogger.Printf("Prefix: %s\n", prefix)
 
-	err := gossiper.createTibcoinNode(prefix)
+	err := gossiper.createTibcoinNode(prefix, false)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 	} else {
 		w.WriteHeader(http.StatusOK)
 	}
+}
+
+func (gossiper *Gossiper) NewMinerTibcoinNode(w http.ResponseWriter, r *http.Request) {
+	// Get input
+	prefix := r.FormValue("prefix")
+	gossiper.errLogger.Printf("Prefix: %s\n", prefix)
+
+	err := gossiper.createTibcoinNode(prefix, true)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func (gossiper *Gossiper) SwitchMiningStatus(w http.ResponseWriter, r *http.Request) {
+	gossiper.switchMiningStatus()
+	w.WriteHeader(http.StatusOK)
 }

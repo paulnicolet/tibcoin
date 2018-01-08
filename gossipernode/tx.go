@@ -229,7 +229,9 @@ func (gossiper *Gossiper) computeTxFee(tx *Tx) (int, error) {
 
 func (gossiper *Gossiper) signTx(tx *Tx) (*Tx, error) {
 	signable := tx.getSignable()
+	gossiper.keysMutex.Lock()
 	r, s, err := ecdsa.Sign(rand.Reader, gossiper.privateKey, signable[:])
+	gossiper.keysMutex.Unlock()
 	if err != nil {
 		return nil, err
 	}

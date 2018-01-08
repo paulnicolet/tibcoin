@@ -1,6 +1,7 @@
-const ADDRESS_UPDATE_INTERVAL = 10 * 1000
+const ADDRESS_UPDATE_INTERVAL = 5 * 1000
 const BLOCKS_UPDATE_INTERVAL = 5 * 1000
 const BALANCE_UPDATE_INTERVAL = 6 * 1000
+const MINER_UPDATE_INTERVAL = 4 * 1000
 const MAX_PREFIX_SIZE = 5
 
 var blockchain = {}
@@ -15,27 +16,58 @@ $(document).ready(() => {
 		}
     });
 
-    $('#new-node-form').submit(e => {
+    $('#create-miner').click(e => {
+        console.log(e);
         e.preventDefault();
         if (validatePrefixAddr()) {
-            createTibcoinNode();
+            createTibcoinNode(true);
         } else {
             window.alert("Cannot have a prefix longer than " + MAX_PREFIX_SIZE + ", should contain only alpha-numeric characters and cannot have a prefix containing '0', 'O', 'I' nor 'l'.");
         }
+
+        return false;
     });
+
+    $('#create-node').click(e => {
+        console.log(e);
+        e.preventDefault();
+        if (validatePrefixAddr()) {
+            createTibcoinNode(false);
+        } else {
+            window.alert("Cannot have a prefix longer than " + MAX_PREFIX_SIZE + ", should contain only alpha-numeric characters and cannot have a prefix containing '0', 'O', 'I' nor 'l'.");
+        }
+
+        return false;
+    });
+
+    $('#mining-form').submit(e => {
+        e.preventDefault();
+        switchMiningStatus();
+    });
+
+    $('#switch-mining-div').hide();
 
     updateBlocks();
     getAddress();
     updateBalance();
-    setInterval(getAddress, ADDRESS_UPDATE_INTERVAL)
+    updateMinerStatus();
+    setInterval(getAddress, ADDRESS_UPDATE_INTERVAL);
+    setInterval(updateMinerStatus, MINER_UPDATE_INTERVAL);
     setInterval(updateBlocks, BLOCKS_UPDATE_INTERVAL);
     setInterval(updateBalance, BALANCE_UPDATE_INTERVAL);
 });
 
-function createTibcoinNode() {
+function createTibcoinNode(miner) {
+    if (miner) {
+        url = "/miner-tibcoin-node";
+    }
+    else {
+        url = "/tibcoin-node";
+    }
+
     $.ajax({
         type: "POST",
-        url: "/tibcoin-node",
+        url: url,
         data: $("#new-node-form").serialize(),
     })
     .fail(function() {
@@ -45,6 +77,20 @@ function createTibcoinNode() {
         $('#prefix-input').val("");
         $('#create-node-div').hide();
         UIkit.notification('Your address is being generated...', {status: 'success', pos: 'top-right'});
+    });
+}
+
+function switchMiningStatus() {
+    $.ajax({
+        type: "POST",
+        url: "/switch-mining-status",
+    })
+    .fail(function() {
+        UIkit.notification('Something went wrong when trying to switch the mining status.', {status: 'danger', pos: 'top-right'});
+    })
+    .done(function() {
+        updateMinerStatus();
+        UIkit.notification('Switched mining status.', {status: 'success', pos: 'top-right'});
     });
 }
 
@@ -63,6 +109,8 @@ function getAddress() {
         else {
             $('#address').html(JSON.parse(data)["address"]);
             $('#create-node-div').hide();
+            $('#switch-mining-div').show();
+            console.log(1);
         }
 	});
 }
@@ -86,6 +134,28 @@ function updateBlocks() {
         });
         
 	});
+}
+
+function updateMinerStatus() {
+    $.ajax({
+        type: "GET",
+        url: "/miner",
+    })
+    .fail(function() {
+        console.log('Could not know if miner or not');
+    })
+    .done(function(data) {
+        var miner = JSON.parse(data)["miner"];
+
+        console.log(miner);
+
+        if (miner) {
+            $("#switch-mining").html("Stop mining");
+        }
+        else {
+            $("#switch-mining").html("Start mining");
+        }
+    });
 }
 
 function appendBlock(block) {

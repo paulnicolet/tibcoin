@@ -159,7 +159,7 @@ func (gossiper *Gossiper) shareFile(filename string) error {
 }
 
 // Return address
-func (gossiper *Gossiper) createTibcoinNode(addrPrefix string) error {
+func (gossiper *Gossiper) createTibcoinNode(addrPrefix string, miner bool) error {
 	if gossiper.isTibcoinNode() {
 		return errors.New(fmt.Sprintf("You already have a key pair and an address; address = %s", PublicKeyToAddress(gossiper.publicKey)))
 	}
@@ -174,6 +174,15 @@ func (gossiper *Gossiper) createTibcoinNode(addrPrefix string) error {
 		return errors.New(fmt.Sprintf("The prefix should contain only alpha-numeric characters and cannot contain any '0', 'O', 'I' nor 'l'; prefix = %s", addrPrefix))
 	}
 
+	// Update miner status
+	gossiper.isMinerMutex.Lock()
+	if miner {
+		gossiper.isMiner = true
+	} else {
+		gossiper.isMiner = false
+	}
+	gossiper.isMinerMutex.Unlock()
+
 	go func(){
 		gossiper.createNodeMutex.Lock()
 
@@ -184,11 +193,13 @@ func (gossiper *Gossiper) createTibcoinNode(addrPrefix string) error {
 				panic(err)
 			}
 
+			gossiper.keysMutex.Lock()
 			gossiper.privateKey = privateKey
 			gossiper.publicKey = publicKey
+			gossiper.keysMutex.Unlock()
 
 			// Start the routines
-			gossiper.StartTibcoinRoutines()
+			gossiper.StartTibcoinRoutines(miner)
 		}
 
 		gossiper.createNodeMutex.Unlock()
@@ -212,6 +223,24 @@ func (gossiper *Gossiper) createTx(value int, to string) error {
 
 	// Broadcast transaction
 	return gossiper.broadcastTx(tx)
+}
+
+func (gossiper *Gossiper) switchMiningStatus() {
+	gossiper.isMinerMutex.Lock()
+	if gossiper.isMiner {
+		gossiper.isMiner = false
+	} else {
+		gossiper.isMiner = true
+		gossiper.resetBlockMutex.Lock()
+		gossiper.resetBlock = true
+		gossiper.resetBlockMutex.Unlock()
+		go gossiper.Mine()
+	}
+	gossiper.isMinerMutex.Unlock()
+}
+
+func (gossiper *Gossiper) isMinerNodeAPI() bool {
+	return gossiper.isMinerNode()
 }
 
 type BlockWithHash struct {

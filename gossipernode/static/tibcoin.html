@@ -40,8 +40,18 @@
 					<p>Enter a prefix if you want your address to start with it (leave empty for random address)</p>
 					<input class="uk-input" type="text" name="prefix" id="prefix-input" placeholder="prefix">
 				</div>
-				<div class="uk-width-1-6@m">
-					<button class="uk-button uk-button-default" id="create-node">Create node</button>
+				<div class="uk-width-1-4@m">
+					<button class="uk-button uk-button-default" name="create-miner" id="create-miner">Create node</button>
+					<p></p>
+					<button class="uk-button uk-button-default" name="create-node" id="create-node">Create node (not mining)</button>
+				</div>
+			</form>
+		</div>
+		<div id="switch-mining-div">
+			<h4>Mining</h4>
+			<form class="uk-flex-left" id="mining-form" uk-grid>
+				<div class="uk-width-1-4@m">
+					<button class="uk-button uk-button-default" name="switch-mining" id="switch-mining">Start mining</button>
 				</div>
 			</form>
 		</div>
