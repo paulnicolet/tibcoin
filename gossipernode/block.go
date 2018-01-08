@@ -45,14 +45,16 @@ func (a int64arr) Less(i, j int) bool { return a[i] < a[j] }
 
 var NilHash = BytesToHash(make([]byte, 32))
 
-var InitialTarget, _ = hex.DecodeString("00000F0000000000000000000000000000000000000000000000000000000000")
+var GenesisTime = time.Date(2018, 1, 1, 00, 00, 00, 00, time.UTC).Unix()
+
+var InitialTarget, qwerr = hex.DecodeString("0000040000000000000000000000000000000000000000000000000000000000")
 
 // Nonce found in order to have a genesis block respecting initial target; should be recomputed
 // if anything about the genesis block is changed
-var GenesisNonce uint32 = 691835
+var GenesisNonce uint32 = 4555655
 
 var GenesisBlock = &Block{
-	Timestamp: 			time.Date(2018, 1, 3, 11, 00, 00, 00, time.UTC).Unix(),
+	Timestamp: 			GenesisTime,
 	Height:    			0,
 	Nonce:     			GenesisNonce,
 	Target:    			BytesToHash(InitialTarget),
@@ -563,6 +565,7 @@ func (block *Block) hash() [32]byte {
 	hash.Write([]byte(fmt.Sprintf("%v", block.Timestamp)))
 	hash.Write([]byte(strconv.Itoa(int(block.Height))))
 	hash.Write([]byte(strconv.Itoa(int(block.Nonce))))
+	hash.Write(block.Target[:])
 	hash.Write(block.PrevHash[:])
 	hash.Write(block.TransactionsHash[:])
 

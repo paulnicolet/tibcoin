@@ -248,7 +248,6 @@ func (gossiper *Gossiper) Start() error {
 	}
 
 	// TODO: remove
-
 	/*
 	// Create new block + hash
 	block := GenesisBlock
@@ -268,7 +267,7 @@ func (gossiper *Gossiper) Start() error {
 		nonce++
 
 		block = &Block{
-			Timestamp: 			time.Date(2018, 1, 3, 11, 00, 00, 00, time.UTC).Unix(),
+			Timestamp: 			GenesisTime,
 			Height:    			0,
 			Nonce:     			nonce,
 			Target:    			BytesToHash(InitialTarget),
