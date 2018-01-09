@@ -71,7 +71,7 @@ func (gossiper *Gossiper) getInventory(topBlockHash [32]byte, to *net.UDPAddr) {
 		}
 	}
 
-	gossiper.errLogger.Printf("[bc_rout]: request inventory from neighboor(s), with top %x", topBlockHash[:])
+	gossiper.errLogger.Printf("Request inventory from neighboor(s) with top %x", topBlockHash[:])
 
 }
 
@@ -87,7 +87,7 @@ func addrInList(l []*net.UDPAddr, e *net.UDPAddr) bool {
 
 func (gossiper *Gossiper) requestBlocksFromInventory(inventory [][32]byte, from *net.UDPAddr) {
 
-	gossiper.errLogger.Printf("[bc_rout]: requesting block(s) from inventory of %s", from.String())
+	gossiper.errLogger.Printf("Requesting block(s) from inventory of %s", from.String())
 
 	atLeastOneUnknownBlock := false
 	for _, hash := range inventory {
@@ -136,7 +136,7 @@ func (gossiper *Gossiper) requestBlocksFromInventory(inventory [][32]byte, from 
 			if !containsOngoingRequest {
 				go gossiper.requestBlock(hash)
 
-				gossiper.errLogger.Printf("[bc_rout]: created requester for block %x", hash[:])
+				gossiper.errLogger.Printf("Create requester for block %x", hash[:])
 			}
 		}
 	}
@@ -237,7 +237,7 @@ func (gossiper *Gossiper) requestBlock(blockHash [32]byte) {
 		if currentRequestedPeer != nil {
 			requestedName = currentRequestedPeer.String()
 		}
-		gossiper.errLogger.Printf("[bc_rout]: requesting block %x to %s", blockHash[:], requestedName)
+		gossiper.errLogger.Printf("Requesting block %x to %s", blockHash[:], requestedName)
 	}
 }
 
@@ -313,7 +313,7 @@ func (gossiper *Gossiper) handleBlockRequest(blockRequestPacket *GossiperPacketS
 					concatHash = append(concatHash, blocksHash[i][:]...)
 				}
 
-				gossiper.errLogger.Printf("[bc_rout]: inventory requested, sending to %s, size send = %d", from.String(), counter)
+				gossiper.errLogger.Printf("Inventory requested from %s, size send = %d", from.String(), counter)
 
 				// we are ready to send the inventory
 				packet := &GossipPacket{
@@ -352,7 +352,7 @@ func (gossiper *Gossiper) handleBlockRequest(blockRequestPacket *GossiperPacketS
 		// if yes
 		if containsBlock {
 
-			gossiper.errLogger.Printf("[bc_rout]: block requested  %x, from %s", request.BlockHash[:], from.String())
+			gossiper.errLogger.Printf("Block requested  %x from %s", request.BlockHash[:], from.String())
 
 			return gossiper.sendBlockTo(block, from)
 
@@ -442,7 +442,7 @@ func (gossiper *Gossiper) handleBlockReply(blockReplyPacket *GossiperPacketSende
 		if !corrupted {
 			go gossiper.requestBlocksFromInventory(reply.BlocksHash, from)
 
-			gossiper.errLogger.Printf("[bc_rout]: valid inventory in reply from %s", from.String())
+			gossiper.errLogger.Printf("Valid inventory in reply from %s", from.String())
 			return nil
 		} else {
 			return errors.New("Inventory corrupted")
