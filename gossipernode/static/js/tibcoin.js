@@ -17,7 +17,6 @@ $(document).ready(() => {
     });
 
     $('#create-miner').click(e => {
-        console.log(e);
         e.preventDefault();
         if (validatePrefixAddr()) {
             createTibcoinNode(true);
@@ -29,7 +28,6 @@ $(document).ready(() => {
     });
 
     $('#create-node').click(e => {
-        console.log(e);
         e.preventDefault();
         if (validatePrefixAddr()) {
             createTibcoinNode(false);
@@ -110,7 +108,6 @@ function getAddress() {
             $('#address').html(JSON.parse(data)["address"]);
             $('#create-node-div').hide();
             $('#switch-mining-div').show();
-            console.log(1);
         }
 	});
 }
@@ -146,9 +143,6 @@ function updateMinerStatus() {
     })
     .done(function(data) {
         var miner = JSON.parse(data)["miner"];
-
-        console.log(miner);
-
         if (miner) {
             $("#switch-mining").html("Stop mining");
         }
