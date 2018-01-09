@@ -65,7 +65,7 @@ func GeneratePrivateAndPublicKeys(addrPrefix string) (*ecdsa.PrivateKey, *Public
 
 		address := PublicKeyToAddress(publicKey)
 		if strings.Index(address, "1" + addrPrefix) == 0 {
-			fmt.Printf("Address found: %s\n", address)
+			fmt.Printf("Address found: %s.\n", address)
 			return privateKey, publicKey, nil
 		}
 	}

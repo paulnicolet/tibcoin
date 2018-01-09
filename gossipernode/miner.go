@@ -27,6 +27,8 @@ func (gossiper *Gossiper) Mine() {
 		gossiper.resetBlockMutex.Unlock()
 
 		if resetBlock {
+			gossiper.errLogger.Println("Resetting mining.")
+
 			gossiper.resetBlockMutex.Lock()
 			gossiper.resetBlock = false
 			gossiper.resetBlockMutex.Unlock()
@@ -53,7 +55,7 @@ func (gossiper *Gossiper) Mine() {
 				time.Sleep(60 * time.Second)
 			}
 
-			gossiper.errLogger.Printf("Fees computed with %d txs: %d\n", len(txs), fees)
+			gossiper.errLogger.Printf("Fees computed with %d txs: %d.\n", len(txs), fees)
 
 			// Create Coinbase transaction
 			coinbaseTx, coinbaseErr := gossiper.createCoinbaseTx(fees)
@@ -88,9 +90,9 @@ func (gossiper *Gossiper) Mine() {
 			gossiper.errLogger.Printf("Found new block worth %d tibcoins: %x (height = %d).\n", block.Txs[0].Outputs[0].Value, blockHash[:], block.Height)
 			if gossiper.VerifyBlock(block, blockHash) {
 				// Found block!
-				gossiper.errLogger.Printf("Valid new block")
+				gossiper.errLogger.Printf("Valid mined block.")
 			} else {
-				gossiper.errLogger.Println("Invalid mined block")
+				gossiper.errLogger.Println("Invalid mined block.")
 			}
 
 			gossiper.resetBlockMutex.Lock()

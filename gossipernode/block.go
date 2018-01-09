@@ -20,7 +20,7 @@ type Block struct {
 	Timestamp 			int64
 	Height    			uint32
 	Nonce     			uint32
-	Target    			[32]byte // TODO (maybe): Change into 4 bytes and use difficulty + change it over time
+	Target    			[32]byte
 	TransactionsHash 	[32]byte
 	PrevHash  			[32]byte
 	Txs       			[]*Tx
@@ -66,7 +66,7 @@ var GenesisBlock = &Block{
 // Inspired by: https://en.bitcoin.it/wiki/Protocol_rules#.22block.22_messages
 func (gossiper *Gossiper) VerifyBlock(block *Block, hash [32]byte) bool {
 
-	gossiper.errLogger.Printf("Verifying block %x\n", hash)
+	gossiper.errLogger.Printf("Verifying block %x.\n", hash)
 
 	// Need to take all necessary locks here if VerifyBlock can be called by
 	// multiple threads
@@ -115,6 +115,10 @@ func (gossiper *Gossiper) VerifyBlock(block *Block, hash [32]byte) bool {
 				valid = false
 			}
 		}
+	}
+
+	if valid && !gossiper.verifyTransactionsHash(block, hash) {
+		valid = false
 	}
 
 	if valid && gossiper.isOrphan(block, hash) {
@@ -184,7 +188,7 @@ func (gossiper *Gossiper) VerifyBlock(block *Block, hash [32]byte) bool {
 			}
 
 			if !gossiper.VerifyBlock(orphan, orphanHashToCheck) {
-				gossiper.errLogger.Printf("Orphan of %x failed verification; most likely ok (hash = %x).\n", hash[:], orphanHashToCheck[:])
+				gossiper.errLogger.Printf("Orphan of %x failed verification; most likely ok (orphan hash = %x).\n", hash[:], orphanHashToCheck[:])
 			}
 		}
 	}
@@ -240,6 +244,13 @@ func (gossiper *Gossiper) onlyFirstTxIsCoinbase(block *Block, hash [32]byte) boo
 
 	coinbaseTx := block.Txs[0]
 	return coinbaseTx.isCoinbaseTx()
+}
+
+// Check 10
+// Assume locks: topBlock, forks, blocks
+func (gossiper *Gossiper) verifyTransactionsHash(block *Block, hash [32]byte) bool {
+	hashTxs := hashTxs(block.Txs)
+	return bytes.Equal(block.TransactionsHash[:], hashTxs[:])
 }
 
 // Check 11
